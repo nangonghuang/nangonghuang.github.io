@@ -1,183 +1,257 @@
-<!DOCTYPE HTML>
+<!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
-    <!--Setting-->
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
-    <meta http-equiv="Cache-Control" content="no-siteapp">
-    <meta http-equiv="Cache-Control" content="no-transform">
-    <meta name="renderer" content="webkit|ie-comp|ie-stand">
-    <meta name="apple-mobile-web-app-capable" content="Last Order">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <meta name="format-detection" content="telephone=no,email=no,adress=no">
-    <meta name="browsermode" content="application">
-    <meta name="screen-orientation" content="portrait">
-    <meta name="theme-version" content="1.2.3">
-    <meta name="root" content="/">
-    <link rel="dns-prefetch" href="http://example.com">
-    <!--SEO-->
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
 
-<meta name="keywords" content="" />
+<link rel="stylesheet" href="/css/main.css">
 
 
-<meta name="description" content="在wms服务中，我们可以直接使用它的api来创建一个窗口，显示出来并且通过InputEventReceiver接收输入事件。但是这种方法太原始,并且存在以下一些问题:
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
 
-需要完全的Android..." />
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"right","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="在wms服务中，我们可以直接使用它的api来创建一个窗口，显示出来并且通过InputEventReceiver接收输入事件。但是这种方法太原始,并且存在以下一些问题:  需要完全的Android源码环境 需要自己去处理UI元素的测量，布局和绘制 还需要处理InputEventReceiver事件，分发到合适的窗口 wms来的各种回调">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Android控件总结(显示流程，触摸事件派发)">
+<meta property="og:url" content="http://example.com/2018/08/20/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/index.html">
+<meta property="og:site_name" content="Last Order">
+<meta property="og:description" content="在wms服务中，我们可以直接使用它的api来创建一个窗口，显示出来并且通过InputEventReceiver接收输入事件。但是这种方法太原始,并且存在以下一些问题:  需要完全的Android源码环境 需要自己去处理UI元素的测量，布局和绘制 还需要处理InputEventReceiver事件，分发到合适的窗口 wms来的各种回调">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://example.com/2018/08/20/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/WindowManager%E7%BB%93%E6%9E%84.jpg">
+<meta property="og:image" content="http://example.com/2018/08/20/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/WindowManager.addView%E8%BF%87%E7%A8%8B.jpg">
+<meta property="og:image" content="http://example.com/2018/08/20/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/performTraversals.jpg">
+<meta property="og:image" content="http://example.com/2018/08/20/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/Activity%E7%9A%84%E6%98%BE%E7%A4%BA%E8%BF%87%E7%A8%8B.jpg">
+<meta property="article:published_time" content="2018-08-20T14:25:54.000Z">
+<meta property="article:modified_time" content="2018-11-05T14:15:54.437Z">
+<meta property="article:author" content="不侯鸟">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/2018/08/20/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/WindowManager%E7%BB%93%E6%9E%84.jpg">
+
+<link rel="canonical" href="http://example.com/2018/08/20/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/">
 
 
-<meta name="robots" content="all" />
-<meta name="google" content="all" />
-<meta name="googlebot" content="all" />
-<meta name="verify" content="all" />
-    <!--Title-->
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
 
-<title>
-    
-    Android控件总结(显示流程，触摸事件派发) |
-    
-    Last Order
-</title>
+  <title>Android控件总结(显示流程，触摸事件派发) | Last Order</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
 
 <link rel="alternate" href="/atom.xml" title="Last Order" type="application/atom+xml">
+</head>
 
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
 
-<link rel="icon" href="/favicon.ico">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
 
-    
+  <div class="site-meta">
 
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Last Order</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
 
-<link rel="stylesheet" href="/css/bootstrap.min.css?rev=3.3.7.css">
-<link rel="stylesheet" href="/css/font-awesome.min.css?rev=4.7.0.css">
-<link rel="stylesheet" href="/css/style.css?rev=@@hash.css">
-
-    
-<div class="hide">
-    <script type="text/javascript">
-    var cnzz_protocol = (("https:" == document.location.protocol) ? " https://" : " http://");
-    document.write(unescape("%3Cspan class='cnzz_stat_icon_1263868967 hide' %3E%3Cscript%20src%3D%22https%3A%2F%2Fs95.cnzz.com%2Fz_stat.php%3Fweb_id%3D1272564536%22%3E%3C%2Fscript%3E%3C/span%3E%3Cscript src='" + cnzz_protocol + "s19.cnzz.com/z_stat.php%3Fid%3D1263868967%26show%3Dpic1' type='text/javascript'%3E%3C/script%3E"));
-    </script>
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
 </div>
 
 
 
 
-    
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
 
-<meta name="generator" content="Hexo 5.3.0"></head>
-<!--[if lte IE 8]>
-<style>
-    html{ font-size: 1em }
-</style>
-<![endif]-->
-<!--[if lte IE 9]>
-<div style="ie">你使用的浏览器版本过低，为了你更好的阅读体验，请更新浏览器的版本或者使用其他现代浏览器，比如Chrome、Firefox、Safari等。</div>
-<![endif]-->
-<body>
-    <header class="main-header"  >
-    <div class="main-header-box">
-        <a class="header-avatar" href="/" title='不侯鸟'>
-            <img src="/img/avatar.jpg" alt="logo头像" class="img-responsive center-block">
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
         </a>
-        <div class="branding">
-            <!--<h2 class="text-hide">Snippet主题,从未如此简单有趣</h2>-->
-            
-            <h2>
-                Last Order
-            </h2>
-            
-        </div>
-    </div>
-</header>
-    <nav class="main-navigation">
-    <div class="container">
-        <div class="row">
-            <div class="col-sm-12">
-                <div class="navbar-header"><span class="nav-toggle-button collapsed pull-right" data-toggle="collapse" data-target="#main-menu" id="mnav">
-                        <span class="sr-only"></span>
-                        <i class="fa fa-bars"></i>
-                    </span>
-                    <a class="navbar-brand" href="http://example.com">
-                        Last Order</a>
-                </div>
-                <div class="collapse navbar-collapse" id="main-menu">
-                    <ul class="menu">
-                        
-                        <li role="presentation" class="text-center">
-                            <a href="/"><i class="fa "></i>
-                                首页</a>
-                        </li>
-                        
-                        <li role="presentation" class="text-center">
-                            <a href="/categories/"><i class="fa "></i>
-                                目录</a>
-                        </li>
-                        
-                        <li role="presentation" class="text-center">
-                            <a href="/about/"><i class="fa "></i>
-                                关于</a>
-                        </li>
-                        
-                        <li role="presentation" class="text-center">
-                            <a href="/archives/"><i class="fa "></i>
-                                时间轴</a>
-                        </li>
-                        
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
+      </li>
+  </ul>
 </nav>
-    <section class="content-wrap">
-        <div class="container">
-            <div class="row">
-                <main class="col-md-8 main-content m-post">
-                    <p id="process"></p>
-<article class="post">
-    <div class="post-head">
-        <h1 id="Android控件总结(显示流程，触摸事件派发)">
-            
-            Android控件总结(显示流程，触摸事件派发)
-            
-        </h1>
-        <div class="post-meta">
-    
-    <span class="categories-meta fa-wrap">
-        <i class="fa fa-folder-open-o"></i>
-        <a class="category-link" href="/categories/android-framework/">android_framework</a>
-    </span>
-    
-    
-    <span class="fa-wrap">
-        <i class="fa fa-tags"></i>
-        <span class="tags-meta">
-            
-        </span>
-    </span>
-    
-    
-    
-    <span class="fa-wrap">
-        <i class="fa fa-clock-o"></i>
-        <span class="date-meta">
-            2018/08/20</span>
-    </span>
-    
-    
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
 </div>
-        
-        
-        <p class="fa fa-exclamation-triangle warning">
-            本文于<strong>
-                886</strong>
-            天之前发表，文中内容可能已经过时。
-        </p>
-        
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
     </div>
+  </div>
+
+</div>
+    </header>
+
     
-    <div class="post-body post-content">
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2018/08/20/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="不侯鸟">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Last Order">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Android控件总结(显示流程，触摸事件派发)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-08-20 22:25:54" itemprop="dateCreated datePublished" datetime="2018-08-20T22:25:54+08:00">2018-08-20</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2018-11-05 22:15:54" itemprop="dateModified" datetime="2018-11-05T22:15:54+08:00">2018-11-05</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/android-framework/" itemprop="url" rel="index"><span itemprop="name">android_framework</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
         <p>在wms服务中，我们可以直接使用它的api来创建一个窗口，显示出来并且通过InputEventReceiver接收输入事件。但是这种方法太原始,并且存在以下一些问题:</p>
 <ol>
 <li>需要完全的Android源码环境</li>
@@ -186,9 +260,9 @@
 <li>wms来的各种回调<a id="more"></a>
 因此Android提供了控件系统来帮我们完成各种各样的控件的创建。更高级一点的创建方式是获取 WindowManager,然后通过addView()方法得到一个可以交互的有界面的窗口</li>
 </ol>
-<p>关于WindowManager的一个类图,比较容易混乱的是<code>context.getSystemService(WINDOW)</code>拿到的其实只是一个WindowManagerImpl类，并不是wms服务。。<br><img src="Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/WindowManager%E7%BB%93%E6%9E%84.jpg" alt="WindowManager结构"></p>
+<p>关于WindowManager的一个类图,比较容易混乱的是<code>context.getSystemService(WINDOW)</code>拿到的其实只是一个WindowManagerImpl类，并不是wms服务。。<br><img src="/2018/08/20/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/WindowManager%E7%BB%93%E6%9E%84.jpg" alt="WindowManager结构"></p>
 <h2 id="窗口添加view的过程"><a href="#窗口添加view的过程" class="headerlink" title="窗口添加view的过程"></a>窗口添加view的过程</h2><p>然后是为窗口添加view所发生的调用过程</p>
-<p><img src="Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/WindowManager.addView%E8%BF%87%E7%A8%8B.jpg" alt="WindowManager结构"></p>
+<p><img src="/2018/08/20/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/WindowManager.addView%E8%BF%87%E7%A8%8B.jpg" alt="WindowManager结构"></p>
 <p>我们跟进WindManager.addView()过程，可以看到最终通过RootViewImpl.addView()调用到了PerformTraversals()。除此之外，requestLayout()也会导致 PerformTraversals() 被调用：</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">requestLayout</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (!mHandlingLayoutInLayoutRequest) &#123;   <span class="comment">//在layout过程中会被设置为true</span></span><br><span class="line">        checkThread();</span><br><span class="line">        mLayoutRequested = <span class="keyword">true</span>;</span><br><span class="line">        scheduleTraversals();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"> <span class="function"><span class="keyword">void</span> <span class="title">scheduleTraversals</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (!mTraversalScheduled) &#123;   <span class="comment">//屏蔽重复的调用</span></span><br><span class="line">        mTraversalScheduled = <span class="keyword">true</span>;</span><br><span class="line">        mTraversalBarrier = mHandler.getLooper().getQueue().postSyncBarrier();</span><br><span class="line">        <span class="comment">//即使performTraversals()执行比较快，在一次垂直同步的时间里最多只会调用performTraversals()一次</span></span><br><span class="line">        mChoreographer.postCallback(Choreographer.CALLBACK_TRAVERSAL, mTraversalRunnable, <span class="keyword">null</span>);  </span><br><span class="line">        <span class="keyword">if</span> (!mUnbufferedInputDispatch) &#123;</span><br><span class="line">            scheduleConsumeBatchedInput();</span><br><span class="line">        &#125;</span><br><span class="line">        notifyRendererOfFramePending();</span><br><span class="line">        pokeDrawLockIfNeeded();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">final</span> <span class="class"><span class="keyword">class</span> <span class="title">TraversalRunnable</span> <span class="keyword">implements</span> <span class="title">Runnable</span> </span>&#123;</span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        doTraversal();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">doTraversal</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (mTraversalScheduled) &#123;</span><br><span class="line">        mTraversalScheduled = <span class="keyword">false</span>;</span><br><span class="line">        mHandler.getLooper().getQueue().removeSyncBarrier(mTraversalBarrier);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (mProfile) &#123;</span><br><span class="line">            Debug.startMethodTracing(<span class="string">&quot;ViewAncestor&quot;</span>);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        performTraversals();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (mProfile) &#123;</span><br><span class="line">            Debug.stopMethodTracing();</span><br><span class="line">            mProfile = <span class="keyword">false</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p><code>performTraversals()</code>主要经过了以下几个阶段：</p>
@@ -199,7 +273,7 @@
 <li>布局控件树， 上一步得到测量结果这里就可以计算出控件的位置，将会依次调用View和子类的onLayout()方法</li>
 <li>绘制。将会依次调用View和子类的onDraw()方法</li>
 </ol>
-<p><img src="Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/performTraversals.jpg" alt="WindowManager结构"></p>
+<p><img src="/2018/08/20/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/performTraversals.jpg" alt="WindowManager结构"></p>
 <p>需要注意的是， onMeasure和onLayout,onDraw都是可以跳过的</p>
 <h3 id="测量阶段-1-2-3"><a href="#测量阶段-1-2-3" class="headerlink" title="测量阶段(1,2,3)"></a>测量阶段(1,2,3)</h3><p>第一次测量的时候，使用的 desiredWindowWidth 和 desiredWindowHeight 就是屏幕的大小，后面再测量的时候使用的就是上次测量得出的窗口大小了。在measureHierarchy可以看到，如果performMeasure()的结果带有标记MEASURED_STATE_TOO_SMALL，performMeasure()有可能被调用多次。</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br><span class="line">147</span><br><span class="line">148</span><br><span class="line">149</span><br><span class="line">150</span><br><span class="line">151</span><br><span class="line">152</span><br><span class="line">153</span><br><span class="line">154</span><br><span class="line">155</span><br><span class="line">156</span><br><span class="line">157</span><br><span class="line">158</span><br><span class="line">159</span><br><span class="line">160</span><br><span class="line">161</span><br><span class="line">162</span><br><span class="line">163</span><br><span class="line">164</span><br><span class="line">165</span><br><span class="line">166</span><br><span class="line">167</span><br><span class="line">168</span><br><span class="line">169</span><br><span class="line">170</span><br><span class="line">171</span><br><span class="line">172</span><br><span class="line">173</span><br><span class="line">174</span><br></pre></td><td class="code"><pre><span class="line">performTraversals()&#123;</span><br><span class="line">    ...</span><br><span class="line">    <span class="comment">//预测量阶段</span></span><br><span class="line">    <span class="keyword">if</span> (mFirst) &#123;</span><br><span class="line">        mFullRedrawNeeded = <span class="keyword">true</span>;</span><br><span class="line">        mLayoutRequested = <span class="keyword">true</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> Configuration config = mContext.getResources().getConfiguration();</span><br><span class="line">        <span class="keyword">if</span> (shouldUseDisplaySize(lp)) &#123;</span><br><span class="line">            <span class="comment">// NOTE -- system code, won&#x27;t try to do compat mode.</span></span><br><span class="line">            ...</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            desiredWindowWidth = dipToPx(config.screenWidthDp);</span><br><span class="line">            desiredWindowHeight = dipToPx(config.screenHeightDp);</span><br><span class="line">        &#125;</span><br><span class="line">    <span class="keyword">else</span>&#123;</span><br><span class="line">        desiredWindowWidth = frame.width();</span><br><span class="line">        desiredWindowHeight = frame.height();</span><br><span class="line">        <span class="keyword">if</span> (desiredWindowWidth != mWidth || desiredWindowHeight != mHeight) &#123;</span><br><span class="line">            <span class="keyword">if</span> (DEBUG_ORIENTATION) Log.v(mTag, <span class="string">&quot;View &quot;</span> + host + <span class="string">&quot; resized to: &quot;</span> + frame);</span><br><span class="line">            mFullRedrawNeeded = <span class="keyword">true</span>;</span><br><span class="line">            mLayoutRequested = <span class="keyword">true</span>;</span><br><span class="line">            windowSizeMayChange = <span class="keyword">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">//没有开始绘制的时候可能会有消息过来，这时候要存在一个队列里面，开始绘制了再执行</span></span><br><span class="line">    getRunQueue().executeActions(mAttachInfo.mHandler);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">boolean</span> layoutRequested = mLayoutRequested &amp;&amp; (!mStopped || mReportNextDraw);</span><br><span class="line">    <span class="keyword">if</span> (layoutRequested) &#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> Resources res = mView.getContext().getResources();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (mFirst) &#123;</span><br><span class="line">            <span class="comment">// make sure touch mode code executes by setting cached value</span></span><br><span class="line">            <span class="comment">// to opposite of the added touch mode.</span></span><br><span class="line">            mAttachInfo.mInTouchMode = !mAddedTouchMode;</span><br><span class="line">            ensureTouchModeLocally(mAddedTouchMode);</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            ...</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// Ask host how big it wants to be</span></span><br><span class="line">        windowSizeMayChange |= measureHierarchy(host, lp, res,</span><br><span class="line">                desiredWindowWidth, desiredWindowHeight);</span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">    <span class="comment">//布局窗口阶段</span></span><br><span class="line">    relayoutResult = relayoutWindow(params, viewVisibility, insetsPending); </span><br><span class="line"></span><br><span class="line">    ...</span><br><span class="line">    <span class="comment">//最终测量阶段，如果wms返回的结果和客户端自己期望的结果不一样，则需要再次测量</span></span><br><span class="line">    <span class="keyword">if</span> (focusChangedDueToTouchMode || mWidth != host.getMeasuredWidth()|| mHeight != host.getMeasuredHeight() </span><br><span class="line">                    || contentInsetsChanged ||updatedConfiguration) &#123;</span><br><span class="line">        <span class="keyword">int</span> childWidthMeasureSpec = getRootMeasureSpec(mWidth, lp.width);</span><br><span class="line">        <span class="keyword">int</span> childHeightMeasureSpec = getRootMeasureSpec(mHeight, lp.height);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (DEBUG_LAYOUT) Log.v(mTag, <span class="string">&quot;Ooops, something changed!  mWidth=&quot;</span></span><br><span class="line">                + mWidth + <span class="string">&quot; measuredWidth=&quot;</span> + host.getMeasuredWidth()</span><br><span class="line">                + <span class="string">&quot; mHeight=&quot;</span> + mHeight</span><br><span class="line">                + <span class="string">&quot; measuredHeight=&quot;</span> + host.getMeasuredHeight()</span><br><span class="line">                + <span class="string">&quot; coveredInsetsChanged=&quot;</span> + contentInsetsChanged);</span><br><span class="line"></span><br><span class="line">            <span class="comment">// Ask host how big it wants to be</span></span><br><span class="line">        performMeasure(childWidthMeasureSpec, childHeightMeasureSpec);</span><br><span class="line">        ...</span><br><span class="line"></span><br><span class="line">        layoutRequested = <span class="keyword">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">//布局控件树</span></span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">boolean</span> <span class="title">measureHierarchy</span><span class="params">(<span class="keyword">final</span> View host, <span class="keyword">final</span> WindowManager.LayoutParams lp,</span></span></span><br><span class="line"><span class="function"><span class="params">        <span class="keyword">final</span> Resources res, <span class="keyword">final</span> <span class="keyword">int</span> desiredWindowWidth, <span class="keyword">final</span> <span class="keyword">int</span> desiredWindowHeight)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">int</span> childWidthMeasureSpec;</span><br><span class="line">    <span class="keyword">int</span> childHeightMeasureSpec;</span><br><span class="line">    <span class="keyword">boolean</span> windowSizeMayChange = <span class="keyword">false</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (DEBUG_ORIENTATION || DEBUG_LAYOUT) Log.v(mTag,</span><br><span class="line">            <span class="string">&quot;Measuring &quot;</span> + host + <span class="string">&quot; in display &quot;</span> + desiredWindowWidth</span><br><span class="line">            + <span class="string">&quot;x&quot;</span> + desiredWindowHeight + <span class="string">&quot;...&quot;</span>);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">boolean</span> goodMeasure = <span class="keyword">false</span>;</span><br><span class="line">    <span class="keyword">if</span> (lp.width == ViewGroup.LayoutParams.WRAP_CONTENT) &#123;</span><br><span class="line">        <span class="comment">// On large screens, we don&#x27;t want to allow dialogs to just</span></span><br><span class="line">        <span class="comment">// stretch to fill the entire width of the screen to display</span></span><br><span class="line">        <span class="comment">// one line of text.  First try doing the layout at a smaller</span></span><br><span class="line">        <span class="comment">// size to see if it will fit.</span></span><br><span class="line">        <span class="keyword">final</span> DisplayMetrics packageMetrics = res.getDisplayMetrics();</span><br><span class="line">        res.getValue(com.android.internal.R.dimen.config_prefDialogWidth, mTmpValue, <span class="keyword">true</span>);</span><br><span class="line">        <span class="keyword">int</span> baseSize = <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">if</span> (mTmpValue.type == TypedValue.TYPE_DIMENSION) &#123;</span><br><span class="line">            baseSize = (<span class="keyword">int</span>)mTmpValue.getDimension(packageMetrics);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (DEBUG_DIALOG) Log.v(mTag, <span class="string">&quot;Window &quot;</span> + mView + <span class="string">&quot;: baseSize=&quot;</span> + baseSize</span><br><span class="line">                + <span class="string">&quot;, desiredWindowWidth=&quot;</span> + desiredWindowWidth);</span><br><span class="line">        <span class="keyword">if</span> (baseSize != <span class="number">0</span> &amp;&amp; desiredWindowWidth &gt; baseSize) &#123;</span><br><span class="line">            childWidthMeasureSpec = getRootMeasureSpec(baseSize, lp.width);</span><br><span class="line">            childHeightMeasureSpec = getRootMeasureSpec(desiredWindowHeight, lp.height);</span><br><span class="line">            performMeasure(childWidthMeasureSpec, childHeightMeasureSpec);</span><br><span class="line">            <span class="keyword">if</span> (DEBUG_DIALOG) Log.v(mTag, <span class="string">&quot;Window &quot;</span> + mView + <span class="string">&quot;: measured (&quot;</span></span><br><span class="line">                    + host.getMeasuredWidth() + <span class="string">&quot;,&quot;</span> + host.getMeasuredHeight()</span><br><span class="line">                    + <span class="string">&quot;) from width spec: &quot;</span> + MeasureSpec.toString(childWidthMeasureSpec)</span><br><span class="line">                    + <span class="string">&quot; and height spec: &quot;</span> + MeasureSpec.toString(childHeightMeasureSpec));</span><br><span class="line">            <span class="keyword">if</span> ((host.getMeasuredWidthAndState()&amp;View.MEASURED_STATE_TOO_SMALL) == <span class="number">0</span>) &#123;</span><br><span class="line">                goodMeasure = <span class="keyword">true</span>;</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                <span class="comment">// Didn&#x27;t fit in that size... try expanding a bit.</span></span><br><span class="line">                baseSize = (baseSize+desiredWindowWidth)/<span class="number">2</span>;</span><br><span class="line">                <span class="keyword">if</span> (DEBUG_DIALOG) Log.v(mTag, <span class="string">&quot;Window &quot;</span> + mView + <span class="string">&quot;: next baseSize=&quot;</span></span><br><span class="line">                        + baseSize);</span><br><span class="line">                childWidthMeasureSpec = getRootMeasureSpec(baseSize, lp.width);</span><br><span class="line">                performMeasure(childWidthMeasureSpec, childHeightMeasureSpec);</span><br><span class="line">                <span class="keyword">if</span> (DEBUG_DIALOG) Log.v(mTag, <span class="string">&quot;Window &quot;</span> + mView + <span class="string">&quot;: measured (&quot;</span></span><br><span class="line">                        + host.getMeasuredWidth() + <span class="string">&quot;,&quot;</span> + host.getMeasuredHeight() + <span class="string">&quot;)&quot;</span>);</span><br><span class="line">                <span class="keyword">if</span> ((host.getMeasuredWidthAndState()&amp;View.MEASURED_STATE_TOO_SMALL) == <span class="number">0</span>) &#123;</span><br><span class="line">                    <span class="keyword">if</span> (DEBUG_DIALOG) Log.v(mTag, <span class="string">&quot;Good!&quot;</span>);</span><br><span class="line">                    goodMeasure = <span class="keyword">true</span>;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (!goodMeasure) &#123;</span><br><span class="line">        childWidthMeasureSpec = getRootMeasureSpec(desiredWindowWidth, lp.width);</span><br><span class="line">        childHeightMeasureSpec = getRootMeasureSpec(desiredWindowHeight, lp.height);</span><br><span class="line">        performMeasure(childWidthMeasureSpec, childHeightMeasureSpec);</span><br><span class="line">        <span class="keyword">if</span> (mWidth != host.getMeasuredWidth() || mHeight != host.getMeasuredHeight()) &#123;</span><br><span class="line">            windowSizeMayChange = <span class="keyword">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (DBG) &#123;</span><br><span class="line">        System.out.println(<span class="string">&quot;======================================&quot;</span>);</span><br><span class="line">        System.out.println(<span class="string">&quot;performTraversals -- after measure&quot;</span>);</span><br><span class="line">        host.debug();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> windowSizeMayChange;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">performMeasure</span><span class="params">(<span class="keyword">int</span> childWidthMeasureSpec, <span class="keyword">int</span> childHeightMeasureSpec)</span> </span>&#123;</span><br><span class="line">    ...</span><br><span class="line">    mView.measure(childWidthMeasureSpec, childHeightMeasureSpec);</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">final</span> <span class="keyword">void</span> <span class="title">measure</span><span class="params">(<span class="keyword">int</span> widthMeasureSpec, <span class="keyword">int</span> heightMeasureSpec)</span> </span>&#123;</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">if</span> (forceLayout || needsLayout) &#123;</span><br><span class="line">        <span class="comment">// first clears the measured dimension flag</span></span><br><span class="line">        mPrivateFlags &amp;= ~PFLAG_MEASURED_DIMENSION_SET;</span><br><span class="line"></span><br><span class="line">        resolveRtlPropertiesIfNeeded();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">int</span> cacheIndex = forceLayout ? -<span class="number">1</span> : mMeasureCache.indexOfKey(key);</span><br><span class="line">        <span class="keyword">if</span> (cacheIndex &lt; <span class="number">0</span> || sIgnoreMeasureCache) &#123;</span><br><span class="line">            <span class="comment">// measure ourselves, this should set the measured dimension flag back</span></span><br><span class="line">            onMeasure(widthMeasureSpec, heightMeasureSpec);</span><br><span class="line">            mPrivateFlags3 &amp;= ~PFLAG3_MEASURE_NEEDED_BEFORE_LAYOUT;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="keyword">long</span> value = mMeasureCache.valueAt(cacheIndex);</span><br><span class="line">            <span class="comment">// Casting a long to int drops the high 32 bits, no mask needed</span></span><br><span class="line">            setMeasuredDimensionRaw((<span class="keyword">int</span>) (value &gt;&gt; <span class="number">32</span>), (<span class="keyword">int</span>) value);</span><br><span class="line">            mPrivateFlags3 |= PFLAG3_MEASURE_NEEDED_BEFORE_LAYOUT;</span><br><span class="line">        &#125;</span><br><span class="line">        ...</span><br><span class="line">        mPrivateFlags |= PFLAG_LAYOUT_REQUIRED; <span class="comment">//measure里面会对flag进行设置，所以不能直接重写measure()，而是写onMeasure()</span></span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
@@ -225,7 +299,7 @@
 <li>绘制子控件 <code>dispatchDraw(canvas);</code>，默认空实现 </li>
 <li>绘制装饰(前景色，滚动条,etc.) <code>onDrawForeground(canvas);</code></li>
 </ol>
-<h2 id="Activity和PhoneWindow"><a href="#Activity和PhoneWindow" class="headerlink" title="Activity和PhoneWindow"></a>Activity和PhoneWindow</h2><p><img src="Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/Activity%E7%9A%84%E6%98%BE%E7%A4%BA%E8%BF%87%E7%A8%8B.jpg" alt="Activity的显示过程"></p>
+<h2 id="Activity和PhoneWindow"><a href="#Activity和PhoneWindow" class="headerlink" title="Activity和PhoneWindow"></a>Activity和PhoneWindow</h2><p><img src="/2018/08/20/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/Activity%E7%9A%84%E6%98%BE%E7%A4%BA%E8%BF%87%E7%A8%8B.jpg" alt="Activity的显示过程"></p>
 <h3 id="PhoneWindow"><a href="#PhoneWindow" class="headerlink" title="PhoneWindow"></a>PhoneWindow</h3><p>通过 WindowManager ，ViewRootImpl 创建窗口的时候，我们仍然需要自行初始化 LayoutParams ，处理控件树的添加和删除等。 Android 在此之上又提供了一套机制，用于更简单的创建窗口和界面。而且 界面提供了预定义的样式，比如 标题栏，图标等，相比于自行创建符合Android规范的界面模板，进一步简化了开发者工作。这些工作是通过一个 com.view.Window 抽象类来实现的，目前它的唯一实现是PhoneWindow 类。我们仅仅需要通过setContentView()设置自己定义的控件树就可以得到一个带有标准模板的窗口界面，模板的样式取决于flag,theme等属性</p>
 <h3 id="DecorView"><a href="#DecorView" class="headerlink" title="DecorView"></a>DecorView</h3><p>DecorView 继承了 FrameLayout , 是 PhoneWindow 类里面的 控件树的根。预定义的样式就是由它实现，在我们通过setContentView()设置自己定义的View的时候，仅仅是设置View到DecorView里面成为它的子view。</p>
 <h2 id="控件焦点"><a href="#控件焦点" class="headerlink" title="控件焦点"></a>控件焦点</h2><ul>
@@ -319,118 +393,221 @@
 <p>更多的细节，会在<a target="_blank" rel="noopener" href="https://nangonghuang.github.io/2018/09/05/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%932/">下一篇</a>中记下来</p>
 
     </div>
+
     
-    <div class="post-footer">
-        <div>
-            
-            转载声明：
-            商业转载请联系作者获得授权,非商业转载请注明出处 © <a href="" target="_blank">Last Order</a>
-            
-            
-        </div>
-        <div>
-            
-        </div>
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2018/08/18/Android-binder%E5%8E%9F%E7%90%86%E5%92%8C%E8%AE%BE%E8%AE%A1/" rel="prev" title="Android binder原理和设计">
+      <i class="fa fa-chevron-left"></i> Android binder原理和设计
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2018/08/26/Android-SystemUI%E7%9A%84%E7%9B%B8%E5%85%B3%E7%B1%BB/" rel="next" title="Android SystemUI的相关类">
+      Android SystemUI的相关类 <i class="fa fa-chevron-right"></i>
+    </a></div>
     </div>
-</article>
-<div class="article-nav prev-next-wrap clearfix">
+      </footer>
     
-    <a href="/2018/08/26/Android-SystemUI%E7%9A%84%E7%9B%B8%E5%85%B3%E7%B1%BB/" class="pre-post btn btn-default" title='Android SystemUI的相关类'>
-        <i class="fa fa-angle-left fa-fw"></i><span class="hidden-lg">上一篇</span>
-        <span class="hidden-xs">
-            Android SystemUI的相关类</span>
-    </a>
-    
-    
-    <a href="/2018/08/18/Android-binder%E5%8E%9F%E7%90%86%E5%92%8C%E8%AE%BE%E8%AE%A1/" class="next-post btn btn-default" title='Android binder原理和设计'>
-        <span class="hidden-lg">下一篇</span>
-        <span class="hidden-xs">
-            Android binder原理和设计</span><i class="fa fa-angle-right fa-fw"></i>
-    </a>
-    
-</div>
+  </article>
+  
+  
+  
 
-<div id="comments">
-    
 
-<div id="vcomments" class="valine"></div>
 
-<script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
-<script src="/assets/valine.min.js"></script>
+          </div>
+          
 
 <script>
-new Valine({
-    av: AV,
-    el: '#vcomments',
-    appId: 'xOKV9J4UeQAtVkvnJC7Kq2Jn-gzGzoHsz',
-    appKey: 'erIpQac4azoCmgfBB7Dl9maa',
-    placeholder: '说点什么吧',
-    notify: false,
-    verify: true,
-    avatar: 'mm',
-    meta: 'nick,mail'.split(','),
-    pageSize: '10',
-    path: window.location.pathname,
-    lang: 'zh-CN'.toLowerCase()
-})
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
 </script>
 
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
 
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AA%97%E5%8F%A3%E6%B7%BB%E5%8A%A0view%E7%9A%84%E8%BF%87%E7%A8%8B"><span class="nav-number">1.</span> <span class="nav-text">窗口添加view的过程</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B5%8B%E9%87%8F%E9%98%B6%E6%AE%B5-1-2-3"><span class="nav-number">1.1.</span> <span class="nav-text">测量阶段(1,2,3)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B8%83%E5%B1%80%E6%8E%A7%E4%BB%B6%E6%A0%91"><span class="nav-number">1.2.</span> <span class="nav-text">布局控件树</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BB%98%E5%88%B6%E6%8E%A7%E4%BB%B6"><span class="nav-number">1.3.</span> <span class="nav-text">绘制控件</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Activity%E5%92%8CPhoneWindow"><span class="nav-number">2.</span> <span class="nav-text">Activity和PhoneWindow</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#PhoneWindow"><span class="nav-number">2.1.</span> <span class="nav-text">PhoneWindow</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#DecorView"><span class="nav-number">2.2.</span> <span class="nav-text">DecorView</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8E%A7%E4%BB%B6%E7%84%A6%E7%82%B9"><span class="nav-number">3.</span> <span class="nav-text">控件焦点</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%93%E5%85%A5%E4%BA%8B%E4%BB%B6%E7%9A%84%E6%B4%BE%E5%8F%91"><span class="nav-number">4.</span> <span class="nav-text">输入事件的派发</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%89%E9%94%AE%E4%BA%8B%E4%BB%B6"><span class="nav-number">4.1.</span> <span class="nav-text">按键事件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%A7%A6%E6%91%B8%E4%BA%8B%E4%BB%B6"><span class="nav-number">4.2.</span> <span class="nav-text">触摸事件</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="不侯鸟"
+      src="/images/avatar.gif">
+  <p class="site-author-name" itemprop="name">不侯鸟</p>
+  <div class="site-description" itemprop="description"></div>
 </div>
-
-                </main>
-                
-                    <aside id="article-toc" role="navigation" class="col-md-4">
-    <div class="widget">
-        <h3 class="title">
-            文章目录
-        </h3>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
         
-        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AA%97%E5%8F%A3%E6%B7%BB%E5%8A%A0view%E7%9A%84%E8%BF%87%E7%A8%8B"><span class="toc-text">窗口添加view的过程</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%B5%8B%E9%87%8F%E9%98%B6%E6%AE%B5-1-2-3"><span class="toc-text">测量阶段(1,2,3)</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%B8%83%E5%B1%80%E6%8E%A7%E4%BB%B6%E6%A0%91"><span class="toc-text">布局控件树</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%BB%98%E5%88%B6%E6%8E%A7%E4%BB%B6"><span class="toc-text">绘制控件</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Activity%E5%92%8CPhoneWindow"><span class="toc-text">Activity和PhoneWindow</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#PhoneWindow"><span class="toc-text">PhoneWindow</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#DecorView"><span class="toc-text">DecorView</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%8E%A7%E4%BB%B6%E7%84%A6%E7%82%B9"><span class="toc-text">控件焦点</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%BE%93%E5%85%A5%E4%BA%8B%E4%BB%B6%E7%9A%84%E6%B4%BE%E5%8F%91"><span class="toc-text">输入事件的派发</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%8C%89%E9%94%AE%E4%BA%8B%E4%BB%B6"><span class="toc-text">按键事件</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%A7%A6%E6%91%B8%E4%BA%8B%E4%BB%B6"><span class="toc-text">触摸事件</span></a></li></ol></li></ol>
+          <span class="site-state-item-count">49</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">6</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/nangonghuang" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;nangonghuang" rel="noopener" target="_blank"><i class="github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://weibo.com/jzlandon/" title="Weibo → https:&#x2F;&#x2F;weibo.com&#x2F;jzlandon&#x2F;" rel="noopener" target="_blank"><i class="weibo fa-fw"></i>Weibo</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="http://powman.org/" title="http:&#x2F;&#x2F;powman.org&#x2F;" rel="noopener" target="_blank">angryPowman</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
         
-    </div>
-</aside>
-                
-            </div>
-        </div>
-    </section>
-    <footer class="main-footer">
-    <div class="container">
-        <div class="row">
-        </div>
-    </div>
-</footer>
-<a id="back-to-top" class="icon-btn hide">
-    <i class="fa fa-chevron-up"></i>
-</a>
-    <div class="copyright">
-    <div class="container">
-        <div class="row">
-            <div class="col-sm-12">
-                <div class="busuanzi">
-    
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">不侯鸟</span>
 </div>
-            </div>
-            <div class="col-sm-12">
-                <span>Copyright &copy;
-                    2017
-                    
-                </span> |
-                <span>
-                    Powered by <a href="//hexo.io" class="copyright-links" target="_blank" rel="nofollow">Hexo</a>
-                </span> |
-                <span>
-                    Theme by <a href="//github.com/shenliyang/hexo-theme-snippet.git" class="copyright-links" target="_blank" rel="nofollow">Snippet</a>
-                </span>
-            </div>
-        </div>
-    </div>
-</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> 强力驱动
+  </div>
+
+        
 
 
 
 
-<script src="/js/app.js?rev=@@hash.js"></script>
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
 
 </body>
 </html>
