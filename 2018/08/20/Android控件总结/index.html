@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"right","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="在wms服务中，我们可以直接使用它的api来创建一个窗口，显示出来并且通过InputEventReceiver接收输入事件。但是这种方法太原始,并且存在以下一些问题:  需要完全的Android源码环境 需要自己去处理UI元素的测量，布局和绘制 还需要处理InputEventReceiver事件，分发到合适的窗口 wms来的各种回调">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Android控件总结(显示流程，触摸事件派发)">
+<meta property="og:url" content="http://example.com/2018/08/20/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/index.html">
+<meta property="og:site_name" content="Last Order">
+<meta property="og:description" content="在wms服务中，我们可以直接使用它的api来创建一个窗口，显示出来并且通过InputEventReceiver接收输入事件。但是这种方法太原始,并且存在以下一些问题:  需要完全的Android源码环境 需要自己去处理UI元素的测量，布局和绘制 还需要处理InputEventReceiver事件，分发到合适的窗口 wms来的各种回调">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://example.com/2018/08/20/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/WindowManager%E7%BB%93%E6%9E%84.jpg">
+<meta property="og:image" content="http://example.com/2018/08/20/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/WindowManager.addView%E8%BF%87%E7%A8%8B.jpg">
+<meta property="og:image" content="http://example.com/2018/08/20/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/performTraversals.jpg">
+<meta property="og:image" content="http://example.com/2018/08/20/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/Activity%E7%9A%84%E6%98%BE%E7%A4%BA%E8%BF%87%E7%A8%8B.jpg">
+<meta property="article:published_time" content="2018-08-20T14:25:54.000Z">
+<meta property="article:modified_time" content="2018-11-05T14:15:54.437Z">
+<meta property="article:author" content="不侯鸟">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/2018/08/20/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/WindowManager%E7%BB%93%E6%9E%84.jpg">
+
+<link rel="canonical" href="http://example.com/2018/08/20/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Android控件总结(显示流程，触摸事件派发) | Last Order</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Last Order</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">逐渐沦为面试准备博客。。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2018/08/20/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="不侯鸟">
+      <meta itemprop="description" content="学习总结">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Last Order">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Android控件总结(显示流程，触摸事件派发)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-08-20 22:25:54" itemprop="dateCreated datePublished" datetime="2018-08-20T22:25:54+08:00">2018-08-20</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2018-11-05 22:15:54" itemprop="dateModified" datetime="2018-11-05T22:15:54+08:00">2018-11-05</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/android-framework/" itemprop="url" rel="index"><span itemprop="name">android_framework</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>在wms服务中，我们可以直接使用它的api来创建一个窗口，显示出来并且通过InputEventReceiver接收输入事件。但是这种方法太原始,并且存在以下一些问题:</p>
+<ol>
+<li>需要完全的Android源码环境</li>
+<li>需要自己去处理UI元素的测量，布局和绘制</li>
+<li>还需要处理InputEventReceiver事件，分发到合适的窗口</li>
+<li>wms来的各种回调<a id="more"></a>
+因此Android提供了控件系统来帮我们完成各种各样的控件的创建。更高级一点的创建方式是获取 WindowManager,然后通过addView()方法得到一个可以交互的有界面的窗口</li>
+</ol>
+<p>关于WindowManager的一个类图,比较容易混乱的是<code>context.getSystemService(WINDOW)</code>拿到的其实只是一个WindowManagerImpl类，并不是wms服务。。<br><img src="Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/WindowManager%E7%BB%93%E6%9E%84.jpg" alt="WindowManager结构"></p>
+<h2 id="窗口添加view的过程"><a href="#窗口添加view的过程" class="headerlink" title="窗口添加view的过程"></a>窗口添加view的过程</h2><p>然后是为窗口添加view所发生的调用过程</p>
+<p><img src="Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/WindowManager.addView%E8%BF%87%E7%A8%8B.jpg" alt="WindowManager结构"></p>
+<p>我们跟进WindManager.addView()过程，可以看到最终通过RootViewImpl.addView()调用到了PerformTraversals()。除此之外，requestLayout()也会导致 PerformTraversals() 被调用：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">requestLayout</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (!mHandlingLayoutInLayoutRequest) &#123;   <span class="comment">//在layout过程中会被设置为true</span></span><br><span class="line">        checkThread();</span><br><span class="line">        mLayoutRequested = <span class="keyword">true</span>;</span><br><span class="line">        scheduleTraversals();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"> <span class="function"><span class="keyword">void</span> <span class="title">scheduleTraversals</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (!mTraversalScheduled) &#123;   <span class="comment">//屏蔽重复的调用</span></span><br><span class="line">        mTraversalScheduled = <span class="keyword">true</span>;</span><br><span class="line">        mTraversalBarrier = mHandler.getLooper().getQueue().postSyncBarrier();</span><br><span class="line">        <span class="comment">//即使performTraversals()执行比较快，在一次垂直同步的时间里最多只会调用performTraversals()一次</span></span><br><span class="line">        mChoreographer.postCallback(Choreographer.CALLBACK_TRAVERSAL, mTraversalRunnable, <span class="keyword">null</span>);  </span><br><span class="line">        <span class="keyword">if</span> (!mUnbufferedInputDispatch) &#123;</span><br><span class="line">            scheduleConsumeBatchedInput();</span><br><span class="line">        &#125;</span><br><span class="line">        notifyRendererOfFramePending();</span><br><span class="line">        pokeDrawLockIfNeeded();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">final</span> <span class="class"><span class="keyword">class</span> <span class="title">TraversalRunnable</span> <span class="keyword">implements</span> <span class="title">Runnable</span> </span>&#123;</span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        doTraversal();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">doTraversal</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (mTraversalScheduled) &#123;</span><br><span class="line">        mTraversalScheduled = <span class="keyword">false</span>;</span><br><span class="line">        mHandler.getLooper().getQueue().removeSyncBarrier(mTraversalBarrier);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (mProfile) &#123;</span><br><span class="line">            Debug.startMethodTracing(<span class="string">&quot;ViewAncestor&quot;</span>);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        performTraversals();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (mProfile) &#123;</span><br><span class="line">            Debug.stopMethodTracing();</span><br><span class="line">            mProfile = <span class="keyword">false</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>performTraversals()</code>主要经过了以下几个阶段：</p>
+<ol>
+<li>预测量阶段，这里会对控件树第一次进行测量，计算出为了显示控件树所希望的窗口大小，将会依次调用view和子类的onMeasure()方法。</li>
+<li>布局窗口阶段，这里会把上一步得到的数据发给wms，wms会对窗口进行重新布局，计算出系统实际上给客户端的窗口大小并返回。</li>
+<li>最终测量阶段，这里只能接受wms给的窗口大小，并根据这个大小最终计算出控件树的实际大小，将会依次调用view和子类的onMeasure()方法。</li>
+<li>布局控件树， 上一步得到测量结果这里就可以计算出控件的位置，将会依次调用View和子类的onLayout()方法</li>
+<li>绘制。将会依次调用View和子类的onDraw()方法</li>
+</ol>
+<p><img src="Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/performTraversals.jpg" alt="WindowManager结构"></p>
+<p>需要注意的是， onMeasure和onLayout,onDraw都是可以跳过的</p>
+<h3 id="测量阶段-1-2-3"><a href="#测量阶段-1-2-3" class="headerlink" title="测量阶段(1,2,3)"></a>测量阶段(1,2,3)</h3><p>第一次测量的时候，使用的 desiredWindowWidth 和 desiredWindowHeight 就是屏幕的大小，后面再测量的时候使用的就是上次测量得出的窗口大小了。在measureHierarchy可以看到，如果performMeasure()的结果带有标记MEASURED_STATE_TOO_SMALL，performMeasure()有可能被调用多次。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br><span class="line">147</span><br><span class="line">148</span><br><span class="line">149</span><br><span class="line">150</span><br><span class="line">151</span><br><span class="line">152</span><br><span class="line">153</span><br><span class="line">154</span><br><span class="line">155</span><br><span class="line">156</span><br><span class="line">157</span><br><span class="line">158</span><br><span class="line">159</span><br><span class="line">160</span><br><span class="line">161</span><br><span class="line">162</span><br><span class="line">163</span><br><span class="line">164</span><br><span class="line">165</span><br><span class="line">166</span><br><span class="line">167</span><br><span class="line">168</span><br><span class="line">169</span><br><span class="line">170</span><br><span class="line">171</span><br><span class="line">172</span><br><span class="line">173</span><br><span class="line">174</span><br></pre></td><td class="code"><pre><span class="line">performTraversals()&#123;</span><br><span class="line">    ...</span><br><span class="line">    <span class="comment">//预测量阶段</span></span><br><span class="line">    <span class="keyword">if</span> (mFirst) &#123;</span><br><span class="line">        mFullRedrawNeeded = <span class="keyword">true</span>;</span><br><span class="line">        mLayoutRequested = <span class="keyword">true</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> Configuration config = mContext.getResources().getConfiguration();</span><br><span class="line">        <span class="keyword">if</span> (shouldUseDisplaySize(lp)) &#123;</span><br><span class="line">            <span class="comment">// NOTE -- system code, won&#x27;t try to do compat mode.</span></span><br><span class="line">            ...</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            desiredWindowWidth = dipToPx(config.screenWidthDp);</span><br><span class="line">            desiredWindowHeight = dipToPx(config.screenHeightDp);</span><br><span class="line">        &#125;</span><br><span class="line">    <span class="keyword">else</span>&#123;</span><br><span class="line">        desiredWindowWidth = frame.width();</span><br><span class="line">        desiredWindowHeight = frame.height();</span><br><span class="line">        <span class="keyword">if</span> (desiredWindowWidth != mWidth || desiredWindowHeight != mHeight) &#123;</span><br><span class="line">            <span class="keyword">if</span> (DEBUG_ORIENTATION) Log.v(mTag, <span class="string">&quot;View &quot;</span> + host + <span class="string">&quot; resized to: &quot;</span> + frame);</span><br><span class="line">            mFullRedrawNeeded = <span class="keyword">true</span>;</span><br><span class="line">            mLayoutRequested = <span class="keyword">true</span>;</span><br><span class="line">            windowSizeMayChange = <span class="keyword">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">//没有开始绘制的时候可能会有消息过来，这时候要存在一个队列里面，开始绘制了再执行</span></span><br><span class="line">    getRunQueue().executeActions(mAttachInfo.mHandler);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">boolean</span> layoutRequested = mLayoutRequested &amp;&amp; (!mStopped || mReportNextDraw);</span><br><span class="line">    <span class="keyword">if</span> (layoutRequested) &#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> Resources res = mView.getContext().getResources();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (mFirst) &#123;</span><br><span class="line">            <span class="comment">// make sure touch mode code executes by setting cached value</span></span><br><span class="line">            <span class="comment">// to opposite of the added touch mode.</span></span><br><span class="line">            mAttachInfo.mInTouchMode = !mAddedTouchMode;</span><br><span class="line">            ensureTouchModeLocally(mAddedTouchMode);</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            ...</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// Ask host how big it wants to be</span></span><br><span class="line">        windowSizeMayChange |= measureHierarchy(host, lp, res,</span><br><span class="line">                desiredWindowWidth, desiredWindowHeight);</span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">    <span class="comment">//布局窗口阶段</span></span><br><span class="line">    relayoutResult = relayoutWindow(params, viewVisibility, insetsPending); </span><br><span class="line"></span><br><span class="line">    ...</span><br><span class="line">    <span class="comment">//最终测量阶段，如果wms返回的结果和客户端自己期望的结果不一样，则需要再次测量</span></span><br><span class="line">    <span class="keyword">if</span> (focusChangedDueToTouchMode || mWidth != host.getMeasuredWidth()|| mHeight != host.getMeasuredHeight() </span><br><span class="line">                    || contentInsetsChanged ||updatedConfiguration) &#123;</span><br><span class="line">        <span class="keyword">int</span> childWidthMeasureSpec = getRootMeasureSpec(mWidth, lp.width);</span><br><span class="line">        <span class="keyword">int</span> childHeightMeasureSpec = getRootMeasureSpec(mHeight, lp.height);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (DEBUG_LAYOUT) Log.v(mTag, <span class="string">&quot;Ooops, something changed!  mWidth=&quot;</span></span><br><span class="line">                + mWidth + <span class="string">&quot; measuredWidth=&quot;</span> + host.getMeasuredWidth()</span><br><span class="line">                + <span class="string">&quot; mHeight=&quot;</span> + mHeight</span><br><span class="line">                + <span class="string">&quot; measuredHeight=&quot;</span> + host.getMeasuredHeight()</span><br><span class="line">                + <span class="string">&quot; coveredInsetsChanged=&quot;</span> + contentInsetsChanged);</span><br><span class="line"></span><br><span class="line">            <span class="comment">// Ask host how big it wants to be</span></span><br><span class="line">        performMeasure(childWidthMeasureSpec, childHeightMeasureSpec);</span><br><span class="line">        ...</span><br><span class="line"></span><br><span class="line">        layoutRequested = <span class="keyword">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">//布局控件树</span></span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">boolean</span> <span class="title">measureHierarchy</span><span class="params">(<span class="keyword">final</span> View host, <span class="keyword">final</span> WindowManager.LayoutParams lp,</span></span></span><br><span class="line"><span class="function"><span class="params">        <span class="keyword">final</span> Resources res, <span class="keyword">final</span> <span class="keyword">int</span> desiredWindowWidth, <span class="keyword">final</span> <span class="keyword">int</span> desiredWindowHeight)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">int</span> childWidthMeasureSpec;</span><br><span class="line">    <span class="keyword">int</span> childHeightMeasureSpec;</span><br><span class="line">    <span class="keyword">boolean</span> windowSizeMayChange = <span class="keyword">false</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (DEBUG_ORIENTATION || DEBUG_LAYOUT) Log.v(mTag,</span><br><span class="line">            <span class="string">&quot;Measuring &quot;</span> + host + <span class="string">&quot; in display &quot;</span> + desiredWindowWidth</span><br><span class="line">            + <span class="string">&quot;x&quot;</span> + desiredWindowHeight + <span class="string">&quot;...&quot;</span>);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">boolean</span> goodMeasure = <span class="keyword">false</span>;</span><br><span class="line">    <span class="keyword">if</span> (lp.width == ViewGroup.LayoutParams.WRAP_CONTENT) &#123;</span><br><span class="line">        <span class="comment">// On large screens, we don&#x27;t want to allow dialogs to just</span></span><br><span class="line">        <span class="comment">// stretch to fill the entire width of the screen to display</span></span><br><span class="line">        <span class="comment">// one line of text.  First try doing the layout at a smaller</span></span><br><span class="line">        <span class="comment">// size to see if it will fit.</span></span><br><span class="line">        <span class="keyword">final</span> DisplayMetrics packageMetrics = res.getDisplayMetrics();</span><br><span class="line">        res.getValue(com.android.internal.R.dimen.config_prefDialogWidth, mTmpValue, <span class="keyword">true</span>);</span><br><span class="line">        <span class="keyword">int</span> baseSize = <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">if</span> (mTmpValue.type == TypedValue.TYPE_DIMENSION) &#123;</span><br><span class="line">            baseSize = (<span class="keyword">int</span>)mTmpValue.getDimension(packageMetrics);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (DEBUG_DIALOG) Log.v(mTag, <span class="string">&quot;Window &quot;</span> + mView + <span class="string">&quot;: baseSize=&quot;</span> + baseSize</span><br><span class="line">                + <span class="string">&quot;, desiredWindowWidth=&quot;</span> + desiredWindowWidth);</span><br><span class="line">        <span class="keyword">if</span> (baseSize != <span class="number">0</span> &amp;&amp; desiredWindowWidth &gt; baseSize) &#123;</span><br><span class="line">            childWidthMeasureSpec = getRootMeasureSpec(baseSize, lp.width);</span><br><span class="line">            childHeightMeasureSpec = getRootMeasureSpec(desiredWindowHeight, lp.height);</span><br><span class="line">            performMeasure(childWidthMeasureSpec, childHeightMeasureSpec);</span><br><span class="line">            <span class="keyword">if</span> (DEBUG_DIALOG) Log.v(mTag, <span class="string">&quot;Window &quot;</span> + mView + <span class="string">&quot;: measured (&quot;</span></span><br><span class="line">                    + host.getMeasuredWidth() + <span class="string">&quot;,&quot;</span> + host.getMeasuredHeight()</span><br><span class="line">                    + <span class="string">&quot;) from width spec: &quot;</span> + MeasureSpec.toString(childWidthMeasureSpec)</span><br><span class="line">                    + <span class="string">&quot; and height spec: &quot;</span> + MeasureSpec.toString(childHeightMeasureSpec));</span><br><span class="line">            <span class="keyword">if</span> ((host.getMeasuredWidthAndState()&amp;View.MEASURED_STATE_TOO_SMALL) == <span class="number">0</span>) &#123;</span><br><span class="line">                goodMeasure = <span class="keyword">true</span>;</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                <span class="comment">// Didn&#x27;t fit in that size... try expanding a bit.</span></span><br><span class="line">                baseSize = (baseSize+desiredWindowWidth)/<span class="number">2</span>;</span><br><span class="line">                <span class="keyword">if</span> (DEBUG_DIALOG) Log.v(mTag, <span class="string">&quot;Window &quot;</span> + mView + <span class="string">&quot;: next baseSize=&quot;</span></span><br><span class="line">                        + baseSize);</span><br><span class="line">                childWidthMeasureSpec = getRootMeasureSpec(baseSize, lp.width);</span><br><span class="line">                performMeasure(childWidthMeasureSpec, childHeightMeasureSpec);</span><br><span class="line">                <span class="keyword">if</span> (DEBUG_DIALOG) Log.v(mTag, <span class="string">&quot;Window &quot;</span> + mView + <span class="string">&quot;: measured (&quot;</span></span><br><span class="line">                        + host.getMeasuredWidth() + <span class="string">&quot;,&quot;</span> + host.getMeasuredHeight() + <span class="string">&quot;)&quot;</span>);</span><br><span class="line">                <span class="keyword">if</span> ((host.getMeasuredWidthAndState()&amp;View.MEASURED_STATE_TOO_SMALL) == <span class="number">0</span>) &#123;</span><br><span class="line">                    <span class="keyword">if</span> (DEBUG_DIALOG) Log.v(mTag, <span class="string">&quot;Good!&quot;</span>);</span><br><span class="line">                    goodMeasure = <span class="keyword">true</span>;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (!goodMeasure) &#123;</span><br><span class="line">        childWidthMeasureSpec = getRootMeasureSpec(desiredWindowWidth, lp.width);</span><br><span class="line">        childHeightMeasureSpec = getRootMeasureSpec(desiredWindowHeight, lp.height);</span><br><span class="line">        performMeasure(childWidthMeasureSpec, childHeightMeasureSpec);</span><br><span class="line">        <span class="keyword">if</span> (mWidth != host.getMeasuredWidth() || mHeight != host.getMeasuredHeight()) &#123;</span><br><span class="line">            windowSizeMayChange = <span class="keyword">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (DBG) &#123;</span><br><span class="line">        System.out.println(<span class="string">&quot;======================================&quot;</span>);</span><br><span class="line">        System.out.println(<span class="string">&quot;performTraversals -- after measure&quot;</span>);</span><br><span class="line">        host.debug();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> windowSizeMayChange;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">performMeasure</span><span class="params">(<span class="keyword">int</span> childWidthMeasureSpec, <span class="keyword">int</span> childHeightMeasureSpec)</span> </span>&#123;</span><br><span class="line">    ...</span><br><span class="line">    mView.measure(childWidthMeasureSpec, childHeightMeasureSpec);</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">final</span> <span class="keyword">void</span> <span class="title">measure</span><span class="params">(<span class="keyword">int</span> widthMeasureSpec, <span class="keyword">int</span> heightMeasureSpec)</span> </span>&#123;</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">if</span> (forceLayout || needsLayout) &#123;</span><br><span class="line">        <span class="comment">// first clears the measured dimension flag</span></span><br><span class="line">        mPrivateFlags &amp;= ~PFLAG_MEASURED_DIMENSION_SET;</span><br><span class="line"></span><br><span class="line">        resolveRtlPropertiesIfNeeded();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">int</span> cacheIndex = forceLayout ? -<span class="number">1</span> : mMeasureCache.indexOfKey(key);</span><br><span class="line">        <span class="keyword">if</span> (cacheIndex &lt; <span class="number">0</span> || sIgnoreMeasureCache) &#123;</span><br><span class="line">            <span class="comment">// measure ourselves, this should set the measured dimension flag back</span></span><br><span class="line">            onMeasure(widthMeasureSpec, heightMeasureSpec);</span><br><span class="line">            mPrivateFlags3 &amp;= ~PFLAG3_MEASURE_NEEDED_BEFORE_LAYOUT;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="keyword">long</span> value = mMeasureCache.valueAt(cacheIndex);</span><br><span class="line">            <span class="comment">// Casting a long to int drops the high 32 bits, no mask needed</span></span><br><span class="line">            setMeasuredDimensionRaw((<span class="keyword">int</span>) (value &gt;&gt; <span class="number">32</span>), (<span class="keyword">int</span>) value);</span><br><span class="line">            mPrivateFlags3 |= PFLAG3_MEASURE_NEEDED_BEFORE_LAYOUT;</span><br><span class="line">        &#125;</span><br><span class="line">        ...</span><br><span class="line">        mPrivateFlags |= PFLAG_LAYOUT_REQUIRED; <span class="comment">//measure里面会对flag进行设置，所以不能直接重写measure()，而是写onMeasure()</span></span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="布局控件树"><a href="#布局控件树" class="headerlink" title="布局控件树"></a>布局控件树</h3><p>这里主要的工作内容是 performLayout() 和  mWindowSession.setTransparentRegion().</p>
+<p>整个窗口默认都是透明区域，当普通控件加入时，控件会把自己的区域从透明区域移除掉，而SurfaceView会把自己的区域添加到当前窗口的透明区域中。<br>随后这个区域会被设置给wms,在surfaceFlinger对surface进行混合的时候，窗口的透明区域将会被忽略掉</p>
+<p>需要注意的是在layout方法里面，会调用到setFrame来检查布局坐标是否变化，如果发生变化，就会调用invalidate(),此时一定会调用onDraw()</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br></pre></td><td class="code"><pre><span class="line">performTraversals()&#123;</span><br><span class="line">    ... <span class="comment">//测量阶段(1,2,3)</span></span><br><span class="line">    <span class="keyword">final</span> <span class="keyword">boolean</span> didLayout = layoutRequested &amp;&amp; (!mStopped || mReportNextDraw);</span><br><span class="line">    <span class="keyword">boolean</span> triggerGlobalLayoutListener = didLayout|| mAttachInfo.mRecomputeGlobalAttributes;</span><br><span class="line">    <span class="keyword">if</span> (didLayout) &#123;</span><br><span class="line">        performLayout(lp, mWidth, mHeight);</span><br><span class="line">        ...</span><br><span class="line">        <span class="keyword">if</span> (!mTransparentRegion.equals(mPreviousTransparentRegion)) &#123;</span><br><span class="line">            mPreviousTransparentRegion.set(mTransparentRegion);</span><br><span class="line">            mFullRedrawNeeded = <span class="keyword">true</span>;</span><br><span class="line">            <span class="comment">// reconfigure window manager</span></span><br><span class="line">            <span class="keyword">try</span> &#123;</span><br><span class="line">                mWindowSession.setTransparentRegion(mWindow, mTransparentRegion);</span><br><span class="line">            &#125; <span class="keyword">catch</span> (RemoteException e) &#123;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    ... <span class="comment">//绘制阶段</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">performLayout</span><span class="params">(WindowManager.LayoutParams lp, <span class="keyword">int</span> desiredWindowWidth,<span class="keyword">int</span> desiredWindowHeight)</span> </span>&#123;</span><br><span class="line">        ...</span><br><span class="line">        <span class="keyword">final</span> View host = mView;</span><br><span class="line">        ...</span><br><span class="line">        host.layout(<span class="number">0</span>, <span class="number">0</span>, host.getMeasuredWidth(), host.getMeasuredHeight());</span><br><span class="line">        ...</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">layout</span><span class="params">(<span class="keyword">int</span> l, <span class="keyword">int</span> t, <span class="keyword">int</span> r, <span class="keyword">int</span> b)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> ((mPrivateFlags3 &amp; PFLAG3_MEASURE_NEEDED_BEFORE_LAYOUT) != <span class="number">0</span>) &#123;</span><br><span class="line">        onMeasure(mOldWidthMeasureSpec, mOldHeightMeasureSpec);</span><br><span class="line">        mPrivateFlags3 &amp;= ~PFLAG3_MEASURE_NEEDED_BEFORE_LAYOUT;</span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">    <span class="comment">//注意这里，setOpticalFrame和setFrame都会调用到setFrame，里面可能会调用invalidate(),此时一定会调用onDraw()</span></span><br><span class="line">    <span class="keyword">boolean</span> changed = isLayoutModeOptical(mParent) ?setOpticalFrame(l, t, r, b) : setFrame(l, t, r, b);</span><br><span class="line">    <span class="keyword">if</span> (changed || (mPrivateFlags &amp; PFLAG_LAYOUT_REQUIRED) == PFLAG_LAYOUT_REQUIRED) &#123;</span><br><span class="line">        onLayout(changed, l, t, r, b);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (shouldDrawRoundScrollbar()) &#123;</span><br><span class="line">            <span class="keyword">if</span>(mRoundScrollbarRenderer == <span class="keyword">null</span>) &#123;</span><br><span class="line">                mRoundScrollbarRenderer = <span class="keyword">new</span> RoundScrollbarRenderer(<span class="keyword">this</span>);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            mRoundScrollbarRenderer = <span class="keyword">null</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        mPrivateFlags &amp;= ~PFLAG_LAYOUT_REQUIRED;  <span class="comment">////layout里面会对flag进行设置，所以不能直接重写layout()，而是写onLayout()</span></span><br><span class="line">        ...</span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">boolean</span> <span class="title">setFrame</span><span class="params">(<span class="keyword">int</span> left, <span class="keyword">int</span> top, <span class="keyword">int</span> right, <span class="keyword">int</span> bottom)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">boolean</span> changed = <span class="keyword">false</span>;</span><br><span class="line">    <span class="keyword">if</span> (mLeft != left || mRight != right || mTop != top || mBottom != bottom) &#123;</span><br><span class="line">        changed = <span class="keyword">true</span>;</span><br><span class="line">        ...</span><br><span class="line">        <span class="keyword">boolean</span> sizeChanged = (newWidth != oldWidth) || (newHeight != oldHeight);</span><br><span class="line">        <span class="comment">// Invalidate our old position</span></span><br><span class="line">        invalidate(sizeChanged);</span><br><span class="line">        ...</span><br><span class="line">        <span class="keyword">if</span> (sizeChanged) &#123;</span><br><span class="line">            sizeChange(newWidth, newHeight, oldWidth, oldHeight);</span><br><span class="line">        &#125;</span><br><span class="line">        ...</span><br><span class="line">    <span class="keyword">return</span> changed;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="绘制控件"><a href="#绘制控件" class="headerlink" title="绘制控件"></a>绘制控件</h3><ol>
+<li>如果view不可见，不需要绘制</li>
+<li>如果surface是新创建的(比如从不可见到可见，此时会新创建surface)，不需要绘制，调用scheduleTraversals()下次再绘制。</li>
+<li>绘制的时候仅仅会对需要重绘的区域进行绘制，这部分区域称为脏区域。如果mDirty为空，有可能不会进行绘制。在控件中表示为<code>PFLAG_DIRTY</code>和<code>PFLAG_DIRTY_OPAQUE</code>,表示这个控件中是否有需要重绘的区域。其中<code>PFLAG_DIRTY_OPAQUE</code>表示此区域是不透明的，如果是整个控件，那就是意思是可以不用控件的底层背景，提高绘制效率。</li>
+</ol>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line">performTraversals()&#123;</span><br><span class="line">    ... <span class="comment">//测量阶段(1,2,3)</span></span><br><span class="line">    ... <span class="comment">//布局阶段</span></span><br><span class="line">    <span class="keyword">boolean</span> cancelDraw = mAttachInfo.mTreeObserver.dispatchOnPreDraw() || !isViewVisible;</span><br><span class="line">    <span class="keyword">if</span> (!cancelDraw &amp;&amp; !newSurface) &#123;</span><br><span class="line">        <span class="keyword">if</span> (mPendingTransitions != <span class="keyword">null</span> &amp;&amp; mPendingTransitions.size() &gt; <span class="number">0</span>) &#123;</span><br><span class="line">            <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; mPendingTransitions.size(); ++i) &#123;</span><br><span class="line">                mPendingTransitions.get(i).startChangingAnimations();</span><br><span class="line">            &#125;</span><br><span class="line">            mPendingTransitions.clear();</span><br><span class="line">        &#125;</span><br><span class="line">        performDraw();</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="keyword">if</span> (isViewVisible) &#123;</span><br><span class="line">            scheduleTraversals();</span><br><span class="line">        &#125;</span><br><span class="line">       ...</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">performDraw</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (mAttachInfo.mDisplayState == Display.STATE_OFF &amp;&amp; !mReportNextDraw) &#123;</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (mView == <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> <span class="keyword">boolean</span> fullRedrawNeeded = mFullRedrawNeeded;</span><br><span class="line">        mFullRedrawNeeded = <span class="keyword">false</span>;</span><br><span class="line"></span><br><span class="line">        mIsDrawing = <span class="keyword">true</span>;</span><br><span class="line">        Trace.traceBegin(Trace.TRACE_TAG_VIEW, <span class="string">&quot;draw&quot;</span>);</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            draw(fullRedrawNeeded);</span><br><span class="line">        &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">            mIsDrawing = <span class="keyword">false</span>;</span><br><span class="line">            Trace.traceEnd(Trace.TRACE_TAG_VIEW);</span><br><span class="line">        &#125;</span><br><span class="line">        ...</span><br><span class="line">        pendingDrawFinished();</span><br><span class="line">        ...</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+<p>这里主要有两个步骤，其中<code>pendingDrawFinished()</code>用来通知 wms 控件绘制结束，wms收到消息后就会把窗口的surface显示出来。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">pendingDrawFinished</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (mDrawsNeededToReport == <span class="number">0</span>) &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> RuntimeException(<span class="string">&quot;Unbalanced drawPending/pendingDrawFinished calls&quot;</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        mDrawsNeededToReport--;</span><br><span class="line">        <span class="keyword">if</span> (mDrawsNeededToReport == <span class="number">0</span>) &#123;</span><br><span class="line">            reportDrawFinished();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">reportDrawFinished</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            mDrawsNeededToReport = <span class="number">0</span>;</span><br><span class="line">            mWindowSession.finishDrawing(mWindow);</span><br><span class="line">        &#125; <span class="keyword">catch</span> (RemoteException e) &#123;</span><br><span class="line">            <span class="comment">// Have fun!</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>另一个则是 控件的绘制过程<code>draw(fullRedrawNeeded);</code>：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">draw</span><span class="params">(<span class="keyword">boolean</span> fullRedrawNeeded)</span> </span>&#123;</span><br><span class="line">        Surface surface = mSurface;</span><br><span class="line">        ... <span class="comment">// 控件滚动的相关计算</span></span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> Rect dirty = mDirty;</span><br><span class="line">        <span class="keyword">if</span> (mSurfaceHolder != <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="comment">// The app owns the surface, we won&#x27;t draw.</span></span><br><span class="line">            dirty.setEmpty();</span><br><span class="line">            <span class="keyword">if</span> (animating &amp;&amp; mScroller != <span class="keyword">null</span>) &#123;</span><br><span class="line">                mScroller.abortAnimation();</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (fullRedrawNeeded) &#123;</span><br><span class="line">            mAttachInfo.mIgnoreDirtyState = <span class="keyword">true</span>;</span><br><span class="line">            dirty.set(<span class="number">0</span>, <span class="number">0</span>, (<span class="keyword">int</span>) (mWidth * appScale + <span class="number">0.5f</span>), (<span class="keyword">int</span>) (mHeight * appScale + <span class="number">0.5f</span>));</span><br><span class="line">        &#125;</span><br><span class="line">        ...</span><br><span class="line">        <span class="keyword">if</span> (!dirty.isEmpty() || mIsAnimating || accessibilityFocusDirty) &#123;</span><br><span class="line">            <span class="keyword">if</span> (mAttachInfo.mThreadedRenderer != <span class="keyword">null</span> &amp;&amp; mAttachInfo.mThreadedRenderer.isEnabled()) &#123;</span><br><span class="line">               ...</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                ...</span><br><span class="line">                <span class="keyword">if</span> (!drawSoftware(surface, mAttachInfo, xOffset, yOffset, scalingRequired, dirty)) &#123;</span><br><span class="line">                    <span class="keyword">return</span>;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        ...</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">boolean</span> <span class="title">drawSoftware</span><span class="params">(Surface surface, AttachInfo attachInfo, <span class="keyword">int</span> xoff, <span class="keyword">int</span> yoff,</span></span></span><br><span class="line"><span class="function"><span class="params">            <span class="keyword">boolean</span> scalingRequired, Rect dirty)</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// Draw with software renderer.</span></span><br><span class="line">        <span class="keyword">final</span> Canvas canvas;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            ...</span><br><span class="line">            canvas = mSurface.lockCanvas(dirty);</span><br><span class="line">            ...</span><br><span class="line">        &#125; <span class="keyword">catch</span> (Surface.OutOfResourcesException e) &#123;</span><br><span class="line">           ...</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            ...</span><br><span class="line">            mView.draw(canvas);</span><br><span class="line">            ...</span><br><span class="line">        &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">            surface.unlockCanvasAndPost(canvas);</span><br><span class="line">            ...</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">draw</span><span class="params">(Canvas canvas)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">final</span> <span class="keyword">int</span> privateFlags = mPrivateFlags;</span><br><span class="line">        <span class="keyword">final</span> <span class="keyword">boolean</span> dirtyOpaque = (privateFlags &amp; PFLAG_DIRTY_MASK) == PFLAG_DIRTY_OPAQUE &amp;&amp;</span><br><span class="line">                (mAttachInfo == <span class="keyword">null</span> || !mAttachInfo.mIgnoreDirtyState);</span><br><span class="line">        mPrivateFlags = (privateFlags &amp; ~PFLAG_DIRTY_MASK) | PFLAG_DRAWN;</span><br><span class="line"></span><br><span class="line">        <span class="comment">/*</span></span><br><span class="line"><span class="comment">         * Draw traversal performs several drawing steps which must be executed</span></span><br><span class="line"><span class="comment">         * in the appropriate order:</span></span><br><span class="line"><span class="comment">         *</span></span><br><span class="line"><span class="comment">         *      1. Draw the background</span></span><br><span class="line"><span class="comment">         *      2. If necessary, save the canvas&#x27; layers to prepare for fading</span></span><br><span class="line"><span class="comment">         *      3. Draw view&#x27;s content</span></span><br><span class="line"><span class="comment">         *      4. Draw children</span></span><br><span class="line"><span class="comment">         *      5. If necessary, draw the fading edges and restore layers</span></span><br><span class="line"><span class="comment">         *      6. Draw decorations (scrollbars for instance)</span></span><br><span class="line"><span class="comment">         */</span></span><br><span class="line"></span><br><span class="line">        <span class="comment">// Step 1, draw the background, if needed</span></span><br><span class="line">        <span class="keyword">int</span> saveCount;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (!dirtyOpaque) &#123;</span><br><span class="line">            drawBackground(canvas);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// skip step 2 &amp; 5 if possible (common case)</span></span><br><span class="line">        <span class="keyword">final</span> <span class="keyword">int</span> viewFlags = mViewFlags;</span><br><span class="line">        <span class="keyword">boolean</span> horizontalEdges = (viewFlags &amp; FADING_EDGE_HORIZONTAL) != <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">boolean</span> verticalEdges = (viewFlags &amp; FADING_EDGE_VERTICAL) != <span class="number">0</span>;</span><br><span class="line">        <span class="comment">//如果不需要绘制 渐变边界，则进入简便流程，跳过2，5步骤</span></span><br><span class="line">        <span class="keyword">if</span> (!verticalEdges &amp;&amp; !horizontalEdges) &#123;</span><br><span class="line">            <span class="comment">// Step 3, draw the content</span></span><br><span class="line">            <span class="keyword">if</span> (!dirtyOpaque) onDraw(canvas);</span><br><span class="line"></span><br><span class="line">            <span class="comment">// Step 4, draw the children</span></span><br><span class="line">            dispatchDraw(canvas);</span><br><span class="line"></span><br><span class="line">            drawAutofilledHighlight(canvas);</span><br><span class="line"></span><br><span class="line">            <span class="comment">// Overlay is part of the content and draws beneath Foreground</span></span><br><span class="line">            <span class="keyword">if</span> (mOverlay != <span class="keyword">null</span> &amp;&amp; !mOverlay.isEmpty()) &#123;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">                mOverlay.getOverlayView().dispatchDraw(canvas);</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="comment">// Step 6, draw decorations (foreground, scrollbars)</span></span><br><span class="line">            onDrawForeground(canvas);</span><br><span class="line"></span><br><span class="line">            <span class="comment">// Step 7, draw the default focus highlight</span></span><br><span class="line">            drawDefaultFocusHighlight(canvas);</span><br><span class="line"></span><br><span class="line">            <span class="keyword">if</span> (debugDraw()) &#123;</span><br><span class="line">                debugDrawFocus(canvas);</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="comment">// we&#x27;re done...</span></span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">//完整流程</span></span><br><span class="line">        ...</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+<p>draw的draw()方法，简便流程主要有以下几步：</p>
+<ol>
+<li>绘制背景 <code>drawBackground()</code></li>
+<li>绘制控件自身，<code>onDraw(canvas)</code>，默认空实现</li>
+<li>绘制子控件 <code>dispatchDraw(canvas);</code>，默认空实现 </li>
+<li>绘制装饰(前景色，滚动条,etc.) <code>onDrawForeground(canvas);</code></li>
+</ol>
+<h2 id="Activity和PhoneWindow"><a href="#Activity和PhoneWindow" class="headerlink" title="Activity和PhoneWindow"></a>Activity和PhoneWindow</h2><p><img src="Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%93/Activity%E7%9A%84%E6%98%BE%E7%A4%BA%E8%BF%87%E7%A8%8B.jpg" alt="Activity的显示过程"></p>
+<h3 id="PhoneWindow"><a href="#PhoneWindow" class="headerlink" title="PhoneWindow"></a>PhoneWindow</h3><p>通过 WindowManager ，ViewRootImpl 创建窗口的时候，我们仍然需要自行初始化 LayoutParams ，处理控件树的添加和删除等。 Android 在此之上又提供了一套机制，用于更简单的创建窗口和界面。而且 界面提供了预定义的样式，比如 标题栏，图标等，相比于自行创建符合Android规范的界面模板，进一步简化了开发者工作。这些工作是通过一个 com.view.Window 抽象类来实现的，目前它的唯一实现是PhoneWindow 类。我们仅仅需要通过setContentView()设置自己定义的控件树就可以得到一个带有标准模板的窗口界面，模板的样式取决于flag,theme等属性</p>
+<h3 id="DecorView"><a href="#DecorView" class="headerlink" title="DecorView"></a>DecorView</h3><p>DecorView 继承了 FrameLayout , 是 PhoneWindow 类里面的 控件树的根。预定义的样式就是由它实现，在我们通过setContentView()设置自己定义的View的时候，仅仅是设置View到DecorView里面成为它的子view。</p>
+<h2 id="控件焦点"><a href="#控件焦点" class="headerlink" title="控件焦点"></a>控件焦点</h2><ul>
+<li>触摸模式(Touch_mode)：在触摸模式下，一些控件比如菜单项，按钮等将不再可以保持或获取焦点，文本框等依然可以获取焦点</li>
+<li>非触摸模式： 在这个模式下，菜单项，按钮等都可以获取焦点，通过方向键使焦点在这些控件之间游走，从而进行选择和确认</li>
+</ul>
+<p>控件能否获取焦点的策略：</p>
+<ol>
+<li>当 NOT_FOCUSABLE 标记位于View.mViewFlags时，无法获取焦点</li>
+<li>当控件的父控件的DescendantFocusability 取值为 FOCUS_BLOCK_DESCENDANTS 时，无法获取焦点。</li>
+<li>当 FOCUSABLE 标记位于View.mViewFlags时，还有两种情况：<ol>
+<li>位于非触摸模式时，可以获取焦点</li>
+<li>位于触摸模式的时候，View.mViewFlags 中存在 FUCUSABLE_IN_TOUCH_MODE标记可以获取焦点，否则不能获取焦点</li>
+</ol>
+</li>
+</ol>
+<p>获取到焦点的控件实际上只是增加了 PFLAG_FOCUSED 标记，而失去焦点则删除这个标记。对于获取到焦点的控件来说，它的父控件则会用 mFocused 变量来保存此控件，这样通过控件树的根节点可以迅速的一层层找到最终拥有焦点的控件。View类则提供两个方法来查询焦点的状态。</p>
+<ol>
+<li><code>isFocused()</code> 表示此控件是否含有<code>PFLAG_FOCUSED</code>标记，即焦点的持有者</li>
+<li><code>hasFocused()</code> 表示焦点是否在其内部，也就是自己或者子控件持有焦点</li>
+</ol>
+<h2 id="输入事件的派发"><a href="#输入事件的派发" class="headerlink" title="输入事件的派发"></a>输入事件的派发</h2><p>在ViewRootImpl.setView()中，ViewRootImpl使用wms分配的 InputChannel 创建了 InputEventReceiver 来接收输入事件，它们通过 onInputEvent()回调来得到事件并且进行处理：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">setview</span><span class="params">(...)</span></span>&#123;</span><br><span class="line">    ...</span><br><span class="line">    mInputEventReceiver = <span class="keyword">new</span> WindowInputEventReceiver(mInputChannel,Looper.myLooper());</span><br><span class="line">    ...</span><br><span class="line">    mSyntheticInputStage = <span class="keyword">new</span> SyntheticInputStage();</span><br><span class="line">    InputStage viewPostImeStage = <span class="keyword">new</span> ViewPostImeInputStage(mSyntheticInputStage);</span><br><span class="line">    InputStage nativePostImeStage = <span class="keyword">new</span> NativePostImeInputStage(viewPostImeStage,<span class="string">&quot;aq:native-post-ime:&quot;</span> + counterSuffix);</span><br><span class="line">    InputStage earlyPostImeStage = <span class="keyword">new</span> EarlyPostImeInputStage(nativePostImeStage);</span><br><span class="line">    InputStage imeStage = <span class="keyword">new</span> ImeInputStage(earlyPostImeStage,<span class="string">&quot;aq:ime:&quot;</span> + counterSuffix);</span><br><span class="line">    InputStage viewPreImeStage = <span class="keyword">new</span> ViewPreImeInputStage(imeStage);</span><br><span class="line">    InputStage nativePreImeStage = <span class="keyword">new</span> NativePreImeInputStage(viewPreImeStage,<span class="string">&quot;aq:native-pre-ime:&quot;</span> + counterSuffix);</span><br><span class="line"></span><br><span class="line">    mFirstInputStage = nativePreImeStage;</span><br><span class="line">    mFirstPostImeInputStage = earlyPostImeStage;</span><br><span class="line">    mPendingInputEventQueueLengthCounterName = <span class="string">&quot;aq:pending:&quot;</span> + counterSuffix;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">final</span> <span class="class"><span class="keyword">class</span> <span class="title">WindowInputEventReceiver</span> <span class="keyword">extends</span> <span class="title">InputEventReceiver</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="title">WindowInputEventReceiver</span><span class="params">(InputChannel inputChannel, Looper looper)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">super</span>(inputChannel, looper);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onInputEvent</span><span class="params">(InputEvent event, <span class="keyword">int</span> displayId)</span> </span>&#123;</span><br><span class="line">        enqueueInputEvent(event, <span class="keyword">this</span>, <span class="number">0</span>, <span class="keyword">true</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onBatchedInputEventPending</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (mUnbufferedInputDispatch) &#123;</span><br><span class="line">            <span class="keyword">super</span>.onBatchedInputEventPending();</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            scheduleConsumeBatchedInput();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">dispose</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        unscheduleConsumeBatchedInput();</span><br><span class="line">        <span class="keyword">super</span>.dispose();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">enqueueInputEvent</span><span class="params">(InputEvent event,</span></span></span><br><span class="line"><span class="function"><span class="params">        InputEventReceiver receiver, <span class="keyword">int</span> flags, <span class="keyword">boolean</span> processImmediately)</span> </span>&#123;</span><br><span class="line">    adjustInputEventForCompatibility(event);</span><br><span class="line">    QueuedInputEvent q = obtainQueuedInputEvent(event, receiver, flags);</span><br><span class="line">    ... <span class="comment">//输入事件加入到链表中</span></span><br><span class="line">    <span class="keyword">if</span> (processImmediately) &#123;</span><br><span class="line">        doProcessInputEvents();</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">//稍后处理，通过handler还是会走到doProcessInputEvents()中</span></span><br><span class="line">        scheduleProcessInputEvents();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">doProcessInputEvents</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="comment">// Deliver all pending input events in the queue.</span></span><br><span class="line">    <span class="keyword">while</span> (mPendingInputEventHead != <span class="keyword">null</span>) &#123;</span><br><span class="line">        QueuedInputEvent q = mPendingInputEventHead;</span><br><span class="line">        mPendingInputEventHead = q.mNext;</span><br><span class="line">        ...</span><br><span class="line">        deliverInputEvent(q);</span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">deliverInputEvent</span><span class="params">(QueuedInputEvent q)</span> </span>&#123;</span><br><span class="line">    Trace.asyncTraceBegin(Trace.TRACE_TAG_VIEW, <span class="string">&quot;deliverInputEvent&quot;</span>,</span><br><span class="line">            q.mEvent.getSequenceNumber());</span><br><span class="line">    <span class="keyword">if</span> (mInputEventConsistencyVerifier != <span class="keyword">null</span>) &#123;</span><br><span class="line">        mInputEventConsistencyVerifier.onInputEvent(q.mEvent, <span class="number">0</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    InputStage stage;</span><br><span class="line">    <span class="keyword">if</span> (q.shouldSendToSynthesizer()) &#123;</span><br><span class="line">        stage = mSyntheticInputStage;</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        stage = q.shouldSkipIme() ? mFirstPostImeInputStage : mFirstInputStage;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (stage != <span class="keyword">null</span>) &#123;</span><br><span class="line">        stage.deliver(q);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">//做一些清理回收工作</span></span><br><span class="line">        finishInputEvent(q);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>其中，输入事件在这里被定义成了几个类型：</p>
+<ol>
+<li>keyEvent 按键事件</li>
+<li>PointerEvent 触摸事件 </li>
+<li>TrackballEvent 轨迹球事件</li>
+<li>GenericMotionEvent 其他事件，比如悬浮(HOVER)事件，游戏手柄等</li>
+</ol>
+<p>而 InputStage 是一个基类，通过Wrapper模式不断的调用apply和forward方法来进行链式调用，定义了6个state，在各个阶段会选择性处理感兴趣的事件，在任一阶段事件被消耗掉了都不会继续传递:</p>
+<ol>
+<li>nativePreImeStage : 这里会把输入事件传给native层看看是否要处理</li>
+<li>viewPreImeStage ： 这里会把输入事件交给view去处理，对 keyEvent事件 调用 <code>mView.dispatchKeyEventPreIme(event)</code></li>
+<li>imeStage : 这里会把输入事件交给输入法窗口去处理，调用<code>imm.dispatchInputEvent(event, q, this, mHandler)</code></li>
+<li>earlyPostImeStage ：这里会进行一些状态记录，触摸模式的确认和退出等</li>
+<li>nativePostImeStage ： 同1一样，只不过这里是在 输入法窗口处理 之后再次传给 native 层</li>
+<li>viewPostImeStage ： 把输入事件交给view去处理 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">int</span> <span class="title">onProcess</span><span class="params">(QueuedInputEvent q)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (q.mEvent <span class="keyword">instanceof</span> KeyEvent) &#123;</span><br><span class="line">        <span class="keyword">return</span> processKeyEvent(q);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="keyword">final</span> <span class="keyword">int</span> source = q.mEvent.getSource();</span><br><span class="line">        <span class="keyword">if</span> ((source &amp; InputDevice.SOURCE_CLASS_POINTER) != <span class="number">0</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> processPointerEvent(q);</span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> ((source &amp; InputDevice.SOURCE_CLASS_TRACKBALL) != <span class="number">0</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> processTrackballEvent(q);</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="keyword">return</span> processGenericMotionEvent(q);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="按键事件"><a href="#按键事件" class="headerlink" title="按键事件"></a>按键事件</h3>keyEvent 按键事件是基于焦点派发的，因为在非触摸模式下，输入法窗口无法获取到焦点，因此在这里会给输入法窗口一个处理的机会。对于view来说，处理的逻辑相对比较简单，如果自己拥有焦点，则调用自己的<code>view.onKeyPreIme()</code>方法去处理，否则调用<code>mFocused.dispatchKeyEventPreIme(event)</code></li>
+</ol>
+<h3 id="触摸事件"><a href="#触摸事件" class="headerlink" title="触摸事件"></a>触摸事件</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ViewRootImply::processPointerEvent</span></span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">int</span> <span class="title">processPointerEvent</span><span class="params">(QueuedInputEvent q)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">final</span> MotionEvent event = (MotionEvent)q.mEvent;</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">boolean</span> handled = mView.dispatchPointerEvent(event);</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">return</span> handled ? FINISH_HANDLED : FORWARD;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//View::dispatchPointerEvent()</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">final</span> <span class="keyword">boolean</span> <span class="title">dispatchPointerEvent</span><span class="params">(MotionEvent event)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (event.isTouchEvent()) &#123;</span><br><span class="line">        <span class="keyword">return</span> dispatchTouchEvent(event);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> dispatchGenericMotionEvent(event);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>多点触摸 ：<br>触摸事件被封装为一个 MotionEvent 类，在多点触摸的情况下，即使 MotionEvent 由一个触摸点触发，它也包含所有触控点的位置信息。这时候通过 <code>MotionEvent.getAction()</code>获取的是一个复合值，低8位描述了动作，高8位描述了触控点的索引号。我们可以通过<code>MotionEvent.getActionMasked()</code>和<code>MotionEvent.getActionIndex()</code>分别获取这两个值。<code>MotionEvent.getX(index)</code>和<code>MotionEvent.getY(index)</code>则接受索引号为参数返回此触摸点的位置。</p>
+<p>索引号不是固定的，比如当我们使用 AB两个手指按下的时候，它们会分别获得的索引号是0和1，当A抬起后，B的索引号则变成了0。但是我们可以通过<code>MotionEvent.getPointerId(index)</code>来获取这个索引号对应的触控点的pointerId,这个值则是在不变的</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//ACTION_DOWN 是第一个手指按下 ，ACTION_UP 是最后一个手指抬起</span></span><br><span class="line">ACTION_DOWN --&gt; ACTION_POINTER_DOWN --&gt;ACTION_POINTER_DOWN --&gt; ACTION_POINTER_UP --&gt; ACTION_POINTER_UP --&gt; ACTION_UP</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+<p>到这里ViewRootImpl把事件传递给了mView对象，而在实际的使用中，这个mView对象则是指 DecorView (参考<code>WindowManagerGlobal::addView</code>方法)，DecorView对<code>dispatchTouchEvent</code>进行了重写：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//DecorView::dispatchTouchEvent</span></span><br><span class="line"> <span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">dispatchTouchEvent</span><span class="params">(MotionEvent ev)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">final</span> Window.Callback cb = mWindow.getCallback();</span><br><span class="line">        <span class="keyword">return</span> cb != <span class="keyword">null</span> &amp;&amp; !mWindow.isDestroyed() &amp;&amp; mFeatureId &lt; <span class="number">0</span></span><br><span class="line">                ? cb.dispatchTouchEvent(ev) : <span class="keyword">super</span>.dispatchTouchEvent(ev);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br></pre></td></tr></table></figure>
+<p>这里的mWindow 则是在 DecorView的构造函数中传入的 Activity的 PhoneWindow类，而它的 Callback ，是在 <code>Activity::onAttach(...)</code>方法中设置的：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//Activity::onAttach(...)</span></span><br><span class="line"><span class="function"><span class="keyword">final</span> <span class="keyword">void</span> <span class="title">attach</span><span class="params">(...)</span></span>&#123;</span><br><span class="line">    ...</span><br><span class="line">    mWindow = <span class="keyword">new</span> PhoneWindow(<span class="keyword">this</span>, window, activityConfigCallback);</span><br><span class="line">    mWindow.setWindowControllerCallback(<span class="keyword">this</span>);</span><br><span class="line">    mWindow.setCallback(<span class="keyword">this</span>); </span><br><span class="line">    ... </span><br><span class="line">&#125; </span><br><span class="line"></span><br><span class="line"><span class="comment">//Activity::dispatchTouchEvent</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">dispatchTouchEvent</span><span class="params">(MotionEvent ev)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (ev.getAction() == MotionEvent.ACTION_DOWN) &#123;</span><br><span class="line">        onUserInteraction();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (getWindow().superDispatchTouchEvent(ev)) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> onTouchEvent(ev);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//PhoneWindow::superDispatchTouchEvent</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">superDispatchTouchEvent</span><span class="params">(MotionEvent event)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> mDecor.superDispatchTouchEvent(event);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//DecorView::superDispatchTouchEvent</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">superDispatchTouchEvent</span><span class="params">(MotionEvent event)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">super</span>.dispatchTouchEvent(event);</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+<p>可以说是绕了一圈又回到了<code>ViewGroup.dispatchTouchEvent</code>中来了，这个过程中，主要是加入了Activity的介入。Activity可以重写dispatchTouchEvent()和onTouchEvent 来在View处理触摸事件之前和之后进行介入。</p>
+<p><code>dispatchTouchEvent()</code>有View和ViewGroup两种实现 :</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// View::dispatchTouchEvent()</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">dispatchTouchEvent</span><span class="params">(MotionEvent event)</span> </span>&#123;</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">boolean</span> result = <span class="keyword">false</span>;</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">if</span> (onFilterTouchEventForSecurity(event)) &#123;</span><br><span class="line">        <span class="keyword">if</span> ((mViewFlags &amp; ENABLED_MASK) == ENABLED &amp;&amp; handleScrollBarDragging(event)) &#123;</span><br><span class="line">            result = <span class="keyword">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">//noinspection SimplifiableIfStatement</span></span><br><span class="line">        ListenerInfo li = mListenerInfo;</span><br><span class="line">        <span class="keyword">if</span> (li != <span class="keyword">null</span> &amp;&amp; li.mOnTouchListener != <span class="keyword">null</span> &amp;&amp; (mViewFlags &amp; ENABLED_MASK) == ENABLED</span><br><span class="line">                &amp;&amp; li.mOnTouchListener.onTouch(<span class="keyword">this</span>, event)) &#123;</span><br><span class="line">            result = <span class="keyword">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (!result &amp;&amp; onTouchEvent(event)) &#123;</span><br><span class="line">            result = <span class="keyword">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">return</span> result;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>对于View来说， dispatchTouchEvent() 主要做了两件事， 先把事件给<code>mOnTouchListener</code>处理，如果<code>mOnTouchListener</code>没有消耗掉，则交给<code>onTouchEvent(event)</code>处理。</p>
+<p>ViewGroup的 dispatchTouchEvent() 相对来说比较复杂，总体来说，分以下几个步骤：</p>
+<ol>
+<li>准备工作：<ol>
+<li>过滤可能导致安全问题的触控事件</li>
+<li>如果是<code>ACTION_DOWN</code>则清空之前留下的touchTarget和touchState</li>
+<li>处理 ViewGroup 的拦截的问题 (<code>FLAG_DISALLOW_INTERCEPT</code>和<code>onInterceptTouchEvent()</code>两个条件)</li>
+</ol>
+</li>
+<li>如果事件没有被拦截或者取消掉，则寻找派发目标：<ol>
+<li>如果是 <code>ACTION_DOWN</code>,<code>ACTION_POINTER_DOWN</code>或者<code>ACTION_HOVER_MOVE</code>之一，则进入下面的处理流程</li>
+<li>记下触摸事件的pointId</li>
+<li>按照一定(PreOrder)的顺序遍历child，如果触摸点不在这个child的控件范围内，则排除掉，否则尝试在自己保存的TouchTarget链表中寻找是否已经保存了;如果找到这个child,那么确定这个child就是此次派发目标，跳出循环，把后续的事件都交给它，寻找派发目标结束;如果在自己保存的TouchTarget链表中没有找到,还是尝试调用 <code>dispatchTransformedTouchEvent(...)</code> 把此次触摸事件派发给这个child控件(如果子控件也是一个ViewGroup,则有可能会继续分发下去)，调用结果是True的时候，为这个child生成新的TouchTarget节点并使用头插法加入到保存的链表中，然后跳出循环；如果调用 <code>dispatchTransformedTouchEvent(...)</code>返回false,表示这个子控件没有处理这个触摸事件，继续遍历child</li>
+</ol>
+</li>
+<li>开始派发事件：<ol>
+<li>如果TouchTarget链表为空，表示子view已经遍历完了，都没有消耗掉这个事件，此时则发给自己处理</li>
+<li>如果TouchTarget链表不为空，表示有子view消耗掉了触摸事件。遍历 TouchTarget 链表的节点，如果是<code>ActionDown</code>之类的事件，则已经在上面第二步中处理过了，结束派发，否则尝试调用<code>dispatchTransformedTouchEvent(...)</code>把此次触摸事件派发给它，如果取消了事件，则需要回收掉该节点。如果失败，则继续尝试下一个节点</li>
+</ol>
+</li>
+</ol>
+<blockquote>
+<p>这里没有太明白TouchTarget设计为链表的原因，即使是子view有重叠的情况，一个触摸点可能会落在多个view的范围内，此时会按照PreOrder的顺序去让它们依次处理，但是只要任意一个子view消耗了<code>ActionDown</code>事件，就会把它存TouchTarget中，后续的动作都不会再添加到TouchTarget了，TouchTarget只会add一次呀。。</p>
+</blockquote>
+<p>派发的函数<code>dispatchTransformedTouchEvent(...)</code>如下所示：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">    * Transforms a motion event into the coordinate space of a particular child view,</span></span><br><span class="line"><span class="comment">    * filters out irrelevant pointer ids, and overrides its action if necessary.</span></span><br><span class="line"><span class="comment">    * If child is null, assumes the MotionEvent will be sent to this ViewGroup instead.</span></span><br><span class="line"><span class="comment">    */</span></span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">boolean</span> <span class="title">dispatchTransformedTouchEvent</span><span class="params">(MotionEvent event, <span class="keyword">boolean</span> cancel,</span></span></span><br><span class="line"><span class="function"><span class="params">        View child, <span class="keyword">int</span> desiredPointerIdBits)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">final</span> <span class="keyword">boolean</span> handled;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Canceling motions is a special case.  We don&#x27;t need to perform any transformations</span></span><br><span class="line">    <span class="comment">// or filtering.  The important part is the action, not the contents.</span></span><br><span class="line">    <span class="keyword">final</span> <span class="keyword">int</span> oldAction = event.getAction();</span><br><span class="line">    <span class="keyword">if</span> (cancel || oldAction == MotionEvent.ACTION_CANCEL) &#123;</span><br><span class="line">        event.setAction(MotionEvent.ACTION_CANCEL);</span><br><span class="line">        <span class="keyword">if</span> (child == <span class="keyword">null</span>) &#123;</span><br><span class="line">            handled = <span class="keyword">super</span>.dispatchTouchEvent(event);</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            handled = child.dispatchTouchEvent(event);</span><br><span class="line">        &#125;</span><br><span class="line">        event.setAction(oldAction);</span><br><span class="line">        <span class="keyword">return</span> handled;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Calculate the number of pointers to deliver.</span></span><br><span class="line">    <span class="keyword">final</span> <span class="keyword">int</span> oldPointerIdBits = event.getPointerIdBits();</span><br><span class="line">    <span class="keyword">final</span> <span class="keyword">int</span> newPointerIdBits = oldPointerIdBits &amp; desiredPointerIdBits;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// If for some reason we ended up in an inconsistent state where it looks like we</span></span><br><span class="line">    <span class="comment">// might produce a motion event with no pointers in it, then drop the event.</span></span><br><span class="line">    <span class="keyword">if</span> (newPointerIdBits == <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// If the number of pointers is the same and we don&#x27;t need to perform any fancy</span></span><br><span class="line">    <span class="comment">// irreversible transformations, then we can reuse the motion event for this</span></span><br><span class="line">    <span class="comment">// dispatch as long as we are careful to revert any changes we make.</span></span><br><span class="line">    <span class="comment">// Otherwise we need to make a copy.</span></span><br><span class="line">    <span class="keyword">final</span> MotionEvent transformedEvent;</span><br><span class="line">    <span class="keyword">if</span> (newPointerIdBits == oldPointerIdBits) &#123;</span><br><span class="line">        <span class="keyword">if</span> (child == <span class="keyword">null</span> || child.hasIdentityMatrix()) &#123;</span><br><span class="line">            <span class="keyword">if</span> (child == <span class="keyword">null</span>) &#123;</span><br><span class="line">                handled = <span class="keyword">super</span>.dispatchTouchEvent(event);</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                <span class="keyword">final</span> <span class="keyword">float</span> offsetX = mScrollX - child.mLeft;</span><br><span class="line">                <span class="keyword">final</span> <span class="keyword">float</span> offsetY = mScrollY - child.mTop;</span><br><span class="line">                event.offsetLocation(offsetX, offsetY);</span><br><span class="line"></span><br><span class="line">                handled = child.dispatchTouchEvent(event);</span><br><span class="line"></span><br><span class="line">                event.offsetLocation(-offsetX, -offsetY);</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">return</span> handled;</span><br><span class="line">        &#125;</span><br><span class="line">        transformedEvent = MotionEvent.obtain(event);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        transformedEvent = event.split(newPointerIdBits);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Perform any necessary transformations and dispatch.</span></span><br><span class="line">    <span class="keyword">if</span> (child == <span class="keyword">null</span>) &#123;</span><br><span class="line">        handled = <span class="keyword">super</span>.dispatchTouchEvent(transformedEvent);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="keyword">final</span> <span class="keyword">float</span> offsetX = mScrollX - child.mLeft;</span><br><span class="line">        <span class="keyword">final</span> <span class="keyword">float</span> offsetY = mScrollY - child.mTop;</span><br><span class="line">        transformedEvent.offsetLocation(offsetX, offsetY);</span><br><span class="line">        <span class="keyword">if</span> (! child.hasIdentityMatrix()) &#123;</span><br><span class="line">            transformedEvent.transform(child.getInverseMatrix());</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        handled = child.dispatchTouchEvent(transformedEvent);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Done.</span></span><br><span class="line">    transformedEvent.recycle();</span><br><span class="line">    <span class="keyword">return</span> handled;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>注释写的很清楚，这个函数的主要功能是：</p>
+<ol>
+<li>把一个motionEvent转化为childview坐标下的坐标点位置。</li>
+<li>过滤不感兴趣的pointerId触摸点</li>
+<li>可能的情况下，修改Action的值。</li>
+<li>如果传入的child为空，则派发给viewGroup自己(即<code>super.dispatchTouchEvent</code>调用到View的方法中去)</li>
+</ol>
+<p>其中，比较复杂的则是 修改Action的值 ，这个涉及到多点触摸的原理和过程，需要另外分析。</p>
+<p>在 ViewGroup 的处理中，有个比较神奇的操作，和常见的使用flags来记录一些预定义的值不一样：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">final</span> <span class="keyword">int</span> idBitsToAssign = split ? <span class="number">1</span> &lt;&lt; ev.getPointerId(actionIndex): TouchTarget.ALL_POINTER_IDS;</span><br></pre></td></tr></table></figure>
+<p>它使用idBitsToAssign 这样一个int值来记录触摸点的信息，因为一个int值最多32bit,所以对于每一个TouchTarget，最多支持32个触摸点</p>
+<p>更多的细节，会在<a target="_blank" rel="noopener" href="https://nangonghuang.github.io/2018/09/05/Android%E6%8E%A7%E4%BB%B6%E6%80%BB%E7%BB%932/">下一篇</a>中记下来</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2018/08/18/Android-binder%E5%8E%9F%E7%90%86%E5%92%8C%E8%AE%BE%E8%AE%A1/" rel="prev" title="Android binder原理和设计">
+      <i class="fa fa-chevron-left"></i> Android binder原理和设计
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2018/08/26/Android-SystemUI%E7%9A%84%E7%9B%B8%E5%85%B3%E7%B1%BB/" rel="next" title="Android SystemUI的相关类">
+      Android SystemUI的相关类 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AA%97%E5%8F%A3%E6%B7%BB%E5%8A%A0view%E7%9A%84%E8%BF%87%E7%A8%8B"><span class="nav-number">1.</span> <span class="nav-text">窗口添加view的过程</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B5%8B%E9%87%8F%E9%98%B6%E6%AE%B5-1-2-3"><span class="nav-number">1.1.</span> <span class="nav-text">测量阶段(1,2,3)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B8%83%E5%B1%80%E6%8E%A7%E4%BB%B6%E6%A0%91"><span class="nav-number">1.2.</span> <span class="nav-text">布局控件树</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BB%98%E5%88%B6%E6%8E%A7%E4%BB%B6"><span class="nav-number">1.3.</span> <span class="nav-text">绘制控件</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Activity%E5%92%8CPhoneWindow"><span class="nav-number">2.</span> <span class="nav-text">Activity和PhoneWindow</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#PhoneWindow"><span class="nav-number">2.1.</span> <span class="nav-text">PhoneWindow</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#DecorView"><span class="nav-number">2.2.</span> <span class="nav-text">DecorView</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8E%A7%E4%BB%B6%E7%84%A6%E7%82%B9"><span class="nav-number">3.</span> <span class="nav-text">控件焦点</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%93%E5%85%A5%E4%BA%8B%E4%BB%B6%E7%9A%84%E6%B4%BE%E5%8F%91"><span class="nav-number">4.</span> <span class="nav-text">输入事件的派发</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%89%E9%94%AE%E4%BA%8B%E4%BB%B6"><span class="nav-number">4.1.</span> <span class="nav-text">按键事件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%A7%A6%E6%91%B8%E4%BA%8B%E4%BB%B6"><span class="nav-number">4.2.</span> <span class="nav-text">触摸事件</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="不侯鸟"
+      src="/images/avatar.gif">
+  <p class="site-author-name" itemprop="name">不侯鸟</p>
+  <div class="site-description" itemprop="description">学习总结</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">49</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">6</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/nangonghuang" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;nangonghuang" rel="noopener" target="_blank"><i class="github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://weibo.com/jzlandon/" title="Weibo → https:&#x2F;&#x2F;weibo.com&#x2F;jzlandon&#x2F;" rel="noopener" target="_blank"><i class="weibo fa-fw"></i>Weibo</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="http://powman.org/" title="http:&#x2F;&#x2F;powman.org&#x2F;" rel="noopener" target="_blank">angryPowman</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">不侯鸟</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"right","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="来源,在这里看到的一些总结，觉得有些收获">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Android-ANR分析">
+<meta property="og:url" content="http://example.com/2017/11/24/Android-ANR%E5%88%86%E6%9E%90/index.html">
+<meta property="og:site_name" content="Last Order">
+<meta property="og:description" content="来源,在这里看到的一些总结，觉得有些收获">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2017-11-24T02:28:58.000Z">
+<meta property="article:modified_time" content="2018-10-17T01:46:54.410Z">
+<meta property="article:author" content="不侯鸟">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://example.com/2017/11/24/Android-ANR%E5%88%86%E6%9E%90/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Android-ANR分析 | Last Order</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Last Order</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">逐渐沦为面试准备博客。。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2017/11/24/Android-ANR%E5%88%86%E6%9E%90/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="不侯鸟">
+      <meta itemprop="description" content="学习总结">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Last Order">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Android-ANR分析
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2017-11-24 10:28:58" itemprop="dateCreated datePublished" datetime="2017-11-24T10:28:58+08:00">2017-11-24</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2018-10-17 09:46:54" itemprop="dateModified" datetime="2018-10-17T09:46:54+08:00">2018-10-17</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Android-%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" itemprop="url" rel="index"><span itemprop="name">Android_性能优化</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><a target="_blank" rel="noopener" href="http://blog.csdn.net/dadoneo/article/details/8270107">来源</a>,在这里看到的一些总结，觉得有些收获</p>
+<a id="more"></a>
+
+<h2 id="ANR类型"><a href="#ANR类型" class="headerlink" title="ANR类型"></a>ANR类型</h2><p>ANR一般有三种类型：</p>
+<ol>
+<li><p>KeyDispatchTimeout(5 seconds) –<strong>主要类型</strong></p>
+<p>按键或触摸事件在特定时间内无响应</p>
+</li>
+<li><p>BroadcastTimeout(10 seconds)</p>
+<p>BroadcastReceiver在特定时间内无法处理完成</p>
+</li>
+<li><p>ServiceTimeout(20 seconds) –<strong>小概率类型</strong></p>
+<p>Service在特定的时间内无法处理完成</p>
+</li>
+</ol>
+<h2 id="如何去分析ANR"><a href="#如何去分析ANR" class="headerlink" title="如何去分析ANR"></a>如何去分析ANR</h2><p>先看个LOG:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line">04-01 13:12:11.572** I&#x2F;InputDispatcher( 220): Application is not responding**:Window&#123;2b263310com.android.email&#x2F;com.android.email.activity.SplitScreenActivitypaused&#x3D;false&#125;.  5009.8ms since event, 5009.5ms since waitstarted</span><br><span class="line"></span><br><span class="line">04-0113:12:11.572 I&#x2F;WindowManager( 220): Input event dispatching timedout sending tocom.android.email&#x2F;com.android.email.activity.SplitScreenActivity</span><br><span class="line"></span><br><span class="line">04-01 **13:12:14.123 I&#x2F;Process(  220): Sending signal. PID: 21404 SIG: 3---**发生**ANR**的时间和生成**trace.txt**的时间</span><br><span class="line"></span><br><span class="line">04-01 13:12:14.123 I&#x2F;dalvikvm(21404):threadid&#x3D;4: reacting to signal 3 </span><br><span class="line"></span><br><span class="line">……</span><br><span class="line"></span><br><span class="line">04-0113:12:15.872 E&#x2F;ActivityManager(  220): ANR in com.android.email(com.android.email&#x2F;.activity.SplitScreenActivity)</span><br><span class="line"></span><br><span class="line">04-0113:12:15.872 E&#x2F;ActivityManager(  220): Reason:keyDispatchingTimedOut</span><br><span class="line"></span><br><span class="line">04-0113:12:15.872 E&#x2F;ActivityManager(  220): Load: 8.68 &#x2F; 8.37 &#x2F; 8.53</span><br><span class="line"></span><br><span class="line">04-0113:12:15.872 E&#x2F;ActivityManager(  220): **CPUusage from 4361ms to 699ms ago** ----CPU在ANR发生前的使用情况</span><br><span class="line"></span><br><span class="line">04-0113:12:15.872 E&#x2F;ActivityManager(  220):   5.5%21404&#x2F;com.android.email: 1.3% user + 4.1% kernel &#x2F; faults: 10 minor</span><br><span class="line"></span><br><span class="line">04-0113:12:15.872 E&#x2F;ActivityManager(  220):   4.3%220&#x2F;system_server: 2.7% user + 1.5% kernel &#x2F; faults: 11 minor 2 major</span><br><span class="line"></span><br><span class="line">04-0113:12:15.872 E&#x2F;ActivityManager(  220):   0.9%52&#x2F;spi_qsd.0: 0% user + 0.9% kernel</span><br><span class="line"></span><br><span class="line">04-0113:12:15.872 E&#x2F;ActivityManager(  220):   0.5%65&#x2F;irq&#x2F;170-cyttsp-: 0% user + 0.5% kernel</span><br><span class="line"></span><br><span class="line">04-0113:12:15.872 E&#x2F;ActivityManager(  220):   0.5%296&#x2F;com.android.systemui: 0.5% user + 0% kernel</span><br><span class="line"></span><br><span class="line">04-0113:12:15.872 E&#x2F;ActivityManager(  220): **100%TOTAL: 4.8% user + 7.6% kernel + 87% iowait**</span><br><span class="line"></span><br><span class="line">04-0113:12:15.872 E&#x2F;ActivityManager(  220): **CPUusage from 3697ms to 4223ms later**:-- ANR后CPU的使用量</span><br><span class="line"></span><br><span class="line">04-0113:12:15.872 E&#x2F;ActivityManager(  220):   25%21404&#x2F;com.android.email: 25% user + 0% kernel &#x2F; faults: 191 minor</span><br><span class="line"></span><br><span class="line">04-0113:12:15.872 E&#x2F;ActivityManager(  220):    16% 21603&#x2F;__eas(par.hakan: 16% user + 0% kernel</span><br><span class="line"></span><br><span class="line">04-0113:12:15.872 E&#x2F;ActivityManager(  220):    7.2% 21406&#x2F;GC: 7.2% user + 0% kernel</span><br><span class="line"></span><br><span class="line">04-0113:12:15.872 E&#x2F;ActivityManager(  220):    1.8% 21409&#x2F;Compiler: 1.8% user + 0% kernel</span><br><span class="line"></span><br><span class="line">04-0113:12:15.872 E&#x2F;ActivityManager(  220):   5.5%220&#x2F;system_server: 0% user + 5.5% kernel &#x2F; faults: 1 minor</span><br><span class="line"></span><br><span class="line">04-0113:12:15.872 E&#x2F;ActivityManager(  220):    5.5% 263&#x2F;InputDispatcher: 0% user + 5.5% kernel</span><br><span class="line"></span><br><span class="line">04-0113:12:15.872 E&#x2F;ActivityManager(  220): **32%TOTAL: 28% user + 3.7% kernel**</span><br></pre></td></tr></table></figure>
+<p>从LOG可以看出ANR的类型，CPU的使用情况，如果CPU使用量接近100%，说明当前设备很忙，有可能是CPU饥饿导致了ANR</p>
+<p>如果CPU使用量很少，说明主线程被BLOCK了</p>
+<p>如果IOwait很高，说明ANR有可能是主线程在进行I/O操作造成的</p>
+<p>除了看LOG，解决ANR还得需要trace.txt文件，data/anr/traces.txt </p>
+<h2 id="如何调查并解决ANR"><a href="#如何调查并解决ANR" class="headerlink" title="如何调查并解决ANR"></a>如何调查并解决ANR</h2><ol>
+<li>首先分析log，根据Log里面ANR发生的时间去trace.txt文件里面查到对应的段落</li>
+<li>从trace.txt文件对应的段落里查看调用stack.</li>
+<li>看代码</li>
+<li>仔细查看ANR的成因（iowait?block?memoryleak?）</li>
+</ol>
+<p>例子：</p>
+<p>打开log文件 ， 由于是ANR错误，因此搜索”ANR “ ， 为何要加空格呢，你加上和去掉比较一下就知道了 。 可以屏蔽掉不少保存到anr.log文件的无效信息。</p>
+<p>定位到关键的事件信息如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">01-15 16:49:02.433 E&#x2F;ActivityManager( 2466): ANR in com.android.mms (com.android.mms&#x2F;.ui.SlideshowActivity)</span><br><span class="line"></span><br><span class="line">01-15 16:49:02.433 E&#x2F;ActivityManager( 2466): Reason: keyDispatchingTimedOut</span><br><span class="line"></span><br><span class="line">01-15 16:49:02.433 E&#x2F;ActivityManager( 2466): Load: 0.6 &#x2F; 0.61 &#x2F; 0.42</span><br><span class="line"></span><br><span class="line">01-15 16:49:02.433 E&#x2F;ActivityManager( 2466): CPU usage from 1337225ms to 57ms ago:</span><br><span class="line"></span><br><span class="line">01-15 16:49:02.433 E&#x2F;ActivityManager( 2466):   sensorserver_ya: 8% &#x3D; 0% user + 8%</span><br><span class="line"> kernel &#x2F; faults: 40 minor</span><br><span class="line"></span><br><span class="line">......</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">01-15 16:49:02.433 E&#x2F;ActivityManager( 2466):  -com.android.mms: 0% &#x3D; 0% user + 0%</span><br><span class="line"> kernel</span><br><span class="line"></span><br><span class="line">01-15 16:49:02.433 E&#x2F;ActivityManager( 2466):  -flush-179:8: 0% &#x3D; 0% user + 0% kernel</span><br><span class="line"></span><br><span class="line">01-15 16:49:02.433 E&#x2F;ActivityManager( 2466): TOTAL: 25% &#x3D; 10% user + 14% kernel +</span><br><span class="line"> 0% iowait + 0% irq + 0% softirq</span><br><span class="line"></span><br><span class="line">01-15 16:49:02.436 I&#x2F;        ( 2466): dumpmesg &gt; &quot;&#x2F;data&#x2F;log&#x2F;dumpstate_app_anr.log&quot;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+<p>我们用自然语言来描述一下日志，这也算是一种能力吧 。 </p>
+<p>01-15 16:49:02.433 E/ActivityManager( 2466): ANR in com.android.mms (com.android.mms/.ui.SlideshowActivity)</p>
+<p>翻译：在16:49分2秒433毫秒的时候 ActivityManager （进程号为2466) 发生了如下错误：com.android.mms包下面的.ui.SlideshowActivity<br> 无响应 。</p>
+<p>01-15 16:49:02.433 E/ActivityManager( 2466): Reason: keyDispatchingTimedOut</p>
+<p>翻译：原因 ， keyDispatchingTimeOut - 按键分配超时 </p>
+<p>01-15 16:49:02.433 E/ActivityManager( 2466): Load: 0.6 / 0.61 / 0.42</p>
+<p>翻译：5分钟，10分钟，15分钟内的平均负载分别为：0.6 , 0.61 , 0.42</p>
+<p>在这里我们大概知道问题是什么了，结合我们之前的操作流程，我们知道问题是在点击按钮某时候可能处理不过来按钮事件，导致超时无响应 。那么现在似乎已经可以进行工作了 。<br> 我们知道Activity中是通过重载dispatchTouchEvent(MotionEvent ev)来处理点击屏幕事件  。 然后我们可以顺藤摸瓜，一点点分析去查找原因 。 但这样够了么 ？</p>
+<p>其实不够 ， 至少我们不能准确的知道到底问题在哪儿 ， 只是猜测 ，比如这个应用程序中，我就在顺藤摸瓜的时候发现了多个IO操作的地方都在主线程中，可能引起问题，但不好判断到底是哪个  ，所以我们目前掌握的信息还不够<br> 。 </p>
+<p>于是我们再分析虚拟机信息 ， 搜索“Dalvik Thread”关键词，快速定位到本应用程序的虚拟机信息日志，如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br><span class="line">147</span><br><span class="line">148</span><br><span class="line">149</span><br><span class="line">150</span><br><span class="line">151</span><br><span class="line">152</span><br><span class="line">153</span><br><span class="line">154</span><br><span class="line">155</span><br><span class="line">156</span><br><span class="line">157</span><br><span class="line">158</span><br><span class="line">159</span><br><span class="line">160</span><br><span class="line">161</span><br><span class="line">162</span><br><span class="line">163</span><br><span class="line">164</span><br><span class="line">165</span><br><span class="line">166</span><br><span class="line">167</span><br><span class="line">168</span><br><span class="line">169</span><br><span class="line">170</span><br><span class="line">171</span><br><span class="line">172</span><br><span class="line">173</span><br><span class="line">174</span><br><span class="line">175</span><br><span class="line">176</span><br><span class="line">177</span><br><span class="line">178</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">----- pid 2922 at 2011-01-13 13:51:07 -----</span><br><span class="line"></span><br><span class="line">Cmd line: com.android.mms</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">DALVIK THREADS:</span><br><span class="line"></span><br><span class="line">&quot;main&quot; prio&#x3D;5 tid&#x3D;1 NATIVE</span><br><span class="line"></span><br><span class="line">  | group&#x3D;&quot;main&quot; sCount&#x3D;1 dsCount&#x3D;0 s&#x3D;N obj&#x3D;0x4001d8d0 self&#x3D;0xccc8</span><br><span class="line"></span><br><span class="line">  | sysTid&#x3D;2922 nice&#x3D;0 sched&#x3D;0&#x2F;0 cgrp&#x3D;default handle&#x3D;-1345017808</span><br><span class="line"></span><br><span class="line">  | schedstat&#x3D;( 3497492306 15312897923 10358 )</span><br><span class="line"></span><br><span class="line">  at android.media.MediaPlayer._release(Native Method)</span><br><span class="line"></span><br><span class="line">  at android.media.MediaPlayer.release(MediaPlayer.java:1206)</span><br><span class="line"></span><br><span class="line">  at android.widget.VideoView.stopPlayback(VideoView.java:196)</span><br><span class="line"></span><br><span class="line">  at com.android.mms.ui.SlideView.stopVideo(SlideView.java:640)</span><br><span class="line"></span><br><span class="line">  at com.android.mms.ui.SlideshowPresenter.presentVideo(SlideshowPresenter.java:443)</span><br><span class="line"></span><br><span class="line">  at com.android.mms.ui.SlideshowPresenter.presentRegionMedia(SlideshowPresenter.java:219)</span><br><span class="line"></span><br><span class="line">  at com.android.mms.ui.SlideshowPresenter$4.run(SlideshowPresenter.java:516)</span><br><span class="line"></span><br><span class="line">  at android.os.Handler.handleCallback(Handler.java:587)</span><br><span class="line"></span><br><span class="line">  at android.os.Handler.dispatchMessage(Handler.java:92)</span><br><span class="line"></span><br><span class="line">  at android.os.Looper.loop(Looper.java:123)</span><br><span class="line"></span><br><span class="line">  at android.app.ActivityThread.main(ActivityThread.java:4627)</span><br><span class="line"></span><br><span class="line">  at java.lang.reflect.Method.invokeNative(Native Method)</span><br><span class="line"></span><br><span class="line">  at java.lang.reflect.Method.invoke(Method.java:521)</span><br><span class="line"></span><br><span class="line">  at com.android.internal.os.ZygoteInit$MethodAndArgsCaller.run(ZygoteInit.java:858)</span><br><span class="line"></span><br><span class="line">  at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:616)</span><br><span class="line"></span><br><span class="line">  at dalvik.system.NativeStart.main(Native Method)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">&quot;Binder Thread #3&quot; prio&#x3D;5 tid&#x3D;11 NATIVE</span><br><span class="line"></span><br><span class="line">  | group&#x3D;&quot;main&quot; sCount&#x3D;1 dsCount&#x3D;0 s&#x3D;N obj&#x3D;0x4837f808 self&#x3D;0x242280</span><br><span class="line"></span><br><span class="line">  | sysTid&#x3D;3239 nice&#x3D;0 sched&#x3D;0&#x2F;0 cgrp&#x3D;default handle&#x3D;2341032</span><br><span class="line"></span><br><span class="line">  | schedstat&#x3D;( 32410506 932842514 164 )</span><br><span class="line"></span><br><span class="line">  at dalvik.system.NativeStart.run(Native Method)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">&quot;AsyncQueryWorker&quot; prio&#x3D;5 tid&#x3D;9 WAIT</span><br><span class="line"></span><br><span class="line">  | group&#x3D;&quot;main&quot; sCount&#x3D;1 dsCount&#x3D;0 s&#x3D;N obj&#x3D;0x482f4b80 self&#x3D;0x253e10</span><br><span class="line"></span><br><span class="line">  | sysTid&#x3D;3236 nice&#x3D;0 sched&#x3D;0&#x2F;0 cgrp&#x3D;default handle&#x3D;2432120</span><br><span class="line"></span><br><span class="line">  | schedstat&#x3D;( 3225061 26561350 27 )</span><br><span class="line"></span><br><span class="line">  at java.lang.Object.wait(Native Method)</span><br><span class="line"></span><br><span class="line">  - waiting on &lt;0x482f4da8&gt; (a android.os.MessageQueue)</span><br><span class="line"></span><br><span class="line">  at java.lang.Object.wait(Object.java:288)</span><br><span class="line"></span><br><span class="line">  at android.os.MessageQueue.next(MessageQueue.java:146)</span><br><span class="line"></span><br><span class="line">  at android.os.Looper.loop(Looper.java:110)</span><br><span class="line"></span><br><span class="line">  at android.os.HandlerThread.run(HandlerThread.java:60)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">&quot;Thread-9&quot; prio&#x3D;5 tid&#x3D;8 WAIT</span><br><span class="line"></span><br><span class="line">  | group&#x3D;&quot;main&quot; sCount&#x3D;1 dsCount&#x3D;0 s&#x3D;N obj&#x3D;0x4836e2b0 self&#x3D;0x25af70</span><br><span class="line"></span><br><span class="line">  | sysTid&#x3D;2929 nice&#x3D;0 sched&#x3D;0&#x2F;0 cgrp&#x3D;default handle&#x3D;2370896</span><br><span class="line"></span><br><span class="line">  | schedstat&#x3D;( 130248 4389035 2 )</span><br><span class="line"></span><br><span class="line">  at java.lang.Object.wait(Native Method)</span><br><span class="line"></span><br><span class="line">  - waiting on &lt;0x4836e240&gt; (a java.util.ArrayList)</span><br><span class="line"></span><br><span class="line">  at java.lang.Object.wait(Object.java:288)</span><br><span class="line"></span><br><span class="line">  at com.android.mms.data.Contact$ContactsCache$TaskStack$1.run(Contact.java:488)</span><br><span class="line"></span><br><span class="line">  at java.lang.Thread.run(Thread.java:1096)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">&quot;Binder Thread #2&quot; prio&#x3D;5 tid&#x3D;7 NATIVE</span><br><span class="line"></span><br><span class="line">  | group&#x3D;&quot;main&quot; sCount&#x3D;1 dsCount&#x3D;0 s&#x3D;N obj&#x3D;0x482f8ca0 self&#x3D;0x130fd0</span><br><span class="line"></span><br><span class="line">  | sysTid&#x3D;2928 nice&#x3D;0 sched&#x3D;0&#x2F;0 cgrp&#x3D;default handle&#x3D;1215968</span><br><span class="line"></span><br><span class="line">  | schedstat&#x3D;( 40610049 1837703846 195 )</span><br><span class="line"></span><br><span class="line">  at dalvik.system.NativeStart.run(Native Method)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">&quot;Binder Thread #1&quot; prio&#x3D;5 tid&#x3D;6 NATIVE</span><br><span class="line"></span><br><span class="line">  | group&#x3D;&quot;main&quot; sCount&#x3D;1 dsCount&#x3D;0 s&#x3D;N obj&#x3D;0x482f4a78 self&#x3D;0x128a50</span><br><span class="line"></span><br><span class="line">  | sysTid&#x3D;2927 nice&#x3D;0 sched&#x3D;0&#x2F;0 cgrp&#x3D;default handle&#x3D;1201352</span><br><span class="line"></span><br><span class="line">  | schedstat&#x3D;( 40928066 928867585 190 )</span><br><span class="line"></span><br><span class="line">  at dalvik.system.NativeStart.run(Native Method)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">&quot;Compiler&quot; daemon prio&#x3D;5 tid&#x3D;5 VMWAIT</span><br><span class="line"></span><br><span class="line">  | group&#x3D;&quot;system&quot; sCount&#x3D;1 dsCount&#x3D;0 s&#x3D;N obj&#x3D;0x482f1348 self&#x3D;0x118960</span><br><span class="line"></span><br><span class="line">  | sysTid&#x3D;2926 nice&#x3D;0 sched&#x3D;0&#x2F;0 cgrp&#x3D;default handle&#x3D;1149216</span><br><span class="line"></span><br><span class="line">  | schedstat&#x3D;( 753021350 3774113668 6686 )</span><br><span class="line"></span><br><span class="line">  at dalvik.system.NativeStart.run(Native Method)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">&quot;JDWP&quot; daemon prio&#x3D;5 tid&#x3D;4 VMWAIT</span><br><span class="line"></span><br><span class="line">  | group&#x3D;&quot;system&quot; sCount&#x3D;1 dsCount&#x3D;0 s&#x3D;N obj&#x3D;0x482f12a0 self&#x3D;0x132940</span><br><span class="line"></span><br><span class="line">  | sysTid&#x3D;2925 nice&#x3D;0 sched&#x3D;0&#x2F;0 cgrp&#x3D;default handle&#x3D;1255680</span><br><span class="line"></span><br><span class="line">  | schedstat&#x3D;( 2827103 29553323 19 )</span><br><span class="line"></span><br><span class="line">  at dalvik.system.NativeStart.run(Native Method)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">&quot;Signal Catcher&quot; daemon prio&#x3D;5 tid&#x3D;3 RUNNABLE</span><br><span class="line"></span><br><span class="line">  | group&#x3D;&quot;system&quot; sCount&#x3D;0 dsCount&#x3D;0 s&#x3D;N obj&#x3D;0x482f11e8 self&#x3D;0x135988</span><br><span class="line"></span><br><span class="line">  | sysTid&#x3D;2924 nice&#x3D;0 sched&#x3D;0&#x2F;0 cgrp&#x3D;default handle&#x3D;1173688</span><br><span class="line"></span><br><span class="line">  | schedstat&#x3D;( 11793815 12456169 7 )</span><br><span class="line"></span><br><span class="line">  at dalvik.system.NativeStart.run(Native Method)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">&quot;HeapWorker&quot; daemon prio&#x3D;5 tid&#x3D;2 VMWAIT</span><br><span class="line"></span><br><span class="line">  | group&#x3D;&quot;system&quot; sCount&#x3D;1 dsCount&#x3D;0 s&#x3D;N obj&#x3D;0x45496028 self&#x3D;0x135848</span><br><span class="line"></span><br><span class="line">  | sysTid&#x3D;2923 nice&#x3D;0 sched&#x3D;0&#x2F;0 cgrp&#x3D;default handle&#x3D;1222608</span><br><span class="line"></span><br><span class="line">  | schedstat&#x3D;( 79049792 1520840200 95 )</span><br><span class="line"></span><br><span class="line">  at dalvik.system.NativeStart.run(Native Method)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">----- end 2922 -----</span><br></pre></td></tr></table></figure>
+
+<p>每一段都是一个线程 ，当然我们还是看线程号为1的主线程了。通过分析发现关键问题是这样：</p>
+<p>  at com.android.mms.ui.SlideshowPresenter$3.run(SlideshowPresenter.java:531)</p>
+<p>定位到代码：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line">mHandler.post(new Runnable() &#123;</span><br><span class="line"></span><br><span class="line">​                    public void run() &#123;</span><br><span class="line"></span><br><span class="line">​                        try &#123;</span><br><span class="line"></span><br><span class="line">​                            presentRegionMedia(view, (RegionMediaModel) model, dataChanged);</span><br><span class="line"></span><br><span class="line">​                        &#125; catch (OMADRMException e) &#123;</span><br><span class="line"></span><br><span class="line">​                            Log.e(TAG, e.getMessage(), e);</span><br><span class="line"></span><br><span class="line">​                            Toast.makeText(mContext,</span><br><span class="line"></span><br><span class="line">​                                    mContext.getString(R.string.insufficient_drm_rights),</span><br><span class="line"></span><br><span class="line">​                                    Toast.LENGTH_SHORT).show();</span><br><span class="line"></span><br><span class="line">​                        &#125; catch (IOException e)&#123;</span><br><span class="line"></span><br><span class="line">​                            Log.e(TAG, e.getMessage(), e);</span><br><span class="line"></span><br><span class="line">​                            Toast.makeText(mContext,</span><br><span class="line"></span><br><span class="line">​                                    mContext.getString(R.string.insufficient_drm_rights),</span><br><span class="line"></span><br><span class="line">​                                    Toast.LENGTH_SHORT).show();</span><br><span class="line">​                        &#125;</span><br><span class="line"></span><br><span class="line">​                    &#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>很清楚了， Handler.post 方法之后执行时间太长的问题 。 继续看presentRegionMedia(view, (RegionMediaModel)<br> model, dataChanged);方法 ， 发现最终是调用的framework 中MediaPlayer.stop方法 。</p>
+<p>至此，我们的日志分析算是告一段落 。 可以开始思考解决办法了</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2017/11/22/Java%E8%99%9A%E6%8B%9F%E6%9C%BA-%E7%B1%BB,%E5%AF%B9%E8%B1%A1%EF%BC%8C%E5%86%85%E5%AD%98/" rel="prev" title="Java虚拟机-类,对象，内存">
+      <i class="fa fa-chevron-left"></i> Java虚拟机-类,对象，内存
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2017/12/01/Android-HandlerThread/" rel="next" title="Android-HandlerThread">
+      Android-HandlerThread <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#ANR%E7%B1%BB%E5%9E%8B"><span class="nav-number">1.</span> <span class="nav-text">ANR类型</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A6%82%E4%BD%95%E5%8E%BB%E5%88%86%E6%9E%90ANR"><span class="nav-number">2.</span> <span class="nav-text">如何去分析ANR</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A6%82%E4%BD%95%E8%B0%83%E6%9F%A5%E5%B9%B6%E8%A7%A3%E5%86%B3ANR"><span class="nav-number">3.</span> <span class="nav-text">如何调查并解决ANR</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="不侯鸟"
+      src="/images/avatar.gif">
+  <p class="site-author-name" itemprop="name">不侯鸟</p>
+  <div class="site-description" itemprop="description">学习总结</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">49</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">6</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/nangonghuang" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;nangonghuang" rel="noopener" target="_blank"><i class="github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://weibo.com/jzlandon/" title="Weibo → https:&#x2F;&#x2F;weibo.com&#x2F;jzlandon&#x2F;" rel="noopener" target="_blank"><i class="weibo fa-fw"></i>Weibo</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="http://powman.org/" title="http:&#x2F;&#x2F;powman.org&#x2F;" rel="noopener" target="_blank">angryPowman</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">不侯鸟</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

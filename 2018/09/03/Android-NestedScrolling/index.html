@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"right","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="NestedScrolling 是谷歌推出的用于解决嵌套滑动的解决方案，在CoordinatorLayout中有使用。在 sdk api 21 之后，直接更新到了 View 和 ViewGroup源码里面，同时也在android.support.v4 包中提供了两个接口NestedScrollingChild和NestedScrollingParent, 还和两个辅助类 NestedScrolli">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Android NestedScrolling">
+<meta property="og:url" content="http://example.com/2018/09/03/Android-NestedScrolling/index.html">
+<meta property="og:site_name" content="Last Order">
+<meta property="og:description" content="NestedScrolling 是谷歌推出的用于解决嵌套滑动的解决方案，在CoordinatorLayout中有使用。在 sdk api 21 之后，直接更新到了 View 和 ViewGroup源码里面，同时也在android.support.v4 包中提供了两个接口NestedScrollingChild和NestedScrollingParent, 还和两个辅助类 NestedScrolli">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2018-09-03T02:27:57.000Z">
+<meta property="article:modified_time" content="2018-11-05T14:13:46.548Z">
+<meta property="article:author" content="不侯鸟">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://example.com/2018/09/03/Android-NestedScrolling/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Android NestedScrolling | Last Order</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Last Order</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">逐渐沦为面试准备博客。。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2018/09/03/Android-NestedScrolling/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="不侯鸟">
+      <meta itemprop="description" content="学习总结">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Last Order">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Android NestedScrolling
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-09-03 10:27:57" itemprop="dateCreated datePublished" datetime="2018-09-03T10:27:57+08:00">2018-09-03</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2018-11-05 22:13:46" itemprop="dateModified" datetime="2018-11-05T22:13:46+08:00">2018-11-05</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/android-app/" itemprop="url" rel="index"><span itemprop="name">android_app</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>NestedScrolling 是谷歌推出的用于解决嵌套滑动的解决方案，在CoordinatorLayout中有使用。在 sdk api 21 之后，直接更新到了 View 和 ViewGroup源码里面，同时也在android.support.v4 包中提供了两个接口NestedScrollingChild和NestedScrollingParent, 还和两个辅助类 NestedScrollingChildHelper 和 NestedScrollingParentHelper 用来帮助开发者实现相关功能. 因此在 sdk21之后 系统原生控件是直接支持嵌套滑动的，如果自己需要实现，用那几个相关类就可以了。<a id="more"></a></p>
+<h2 id="原理"><a href="#原理" class="headerlink" title="原理"></a>原理</h2><p>在Android触摸事件的处理中，无论是父类还是子类，一旦拦截了 Action_DOWN ,后续的事件都会发给这个控件，出于兼容的目的，这个流程不会大改，想要在滑动的过程中父类和子类联动，于是新增了接口方法，在 ACITION_MOVE 中进行调用，并且不改变整个onInterceptTouchEvent()和onTouchEvent()的返回值，这样既不会影响到原有流程，又可以让父类和子类进行交互。对于 Fling 的处理则是在 ACTION_UP 中，这个应该很好理解~</p>
+<p>主要的过程则是子控件接收到滑动一段距离的请求时, 先询问父控件是否要滑动, 如果滑动了父控件就通知子控件它消耗了一部分滑动距离, 子控件就处理剩下的滑动距离, 然后子控件滑动完毕后再把剩余的滑动距离传给父控件.这个过程由子控件发起。</p>
+<h2 id="主要类和方法"><a href="#主要类和方法" class="headerlink" title="主要类和方法"></a>主要类和方法</h2><h3 id="NestedScrollingChild"><a href="#NestedScrollingChild" class="headerlink" title="NestedScrollingChild"></a>NestedScrollingChild</h3><ul>
+<li>startNestedScroll : 起始方法, 主要作用是找到接收滑动距离信息的父控件.</li>
+<li>dispatchNestedPreScroll : 在内控件处理滑动前把滑动信息分发给父控件.</li>
+<li>dispatchNestedScroll : 在内控件处理完滑动后把剩下的滑动距离信息分发给父控件.</li>
+<li>stopNestedScroll : 结束方法, 主要作用就是清空嵌套滑动的相关状态</li>
+</ul>
+<p>NestedScrollingChildHelper是对NestedScrollingChild的方法的实现</p>
+<h3 id="NestedScrollingParent"><a href="#NestedScrollingParent" class="headerlink" title="NestedScrollingParent"></a>NestedScrollingParent</h3><p>父控件接口主要是定义了一些响应子控件的方法，以onXXXXX命名和子控件的方法一一对应。</p>
+<p>NestedScrollingParentHelper是对NestedScrollingParent的方法的实现</p>
+<h2 id="源码"><a href="#源码" class="headerlink" title="源码"></a>源码</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Begin a nestable scroll operation along the given axes.</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * &lt;p&gt;A view starting a nested scroll promises to abide by the following contract:&lt;/p&gt;</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * &lt;p&gt;The view will call startNestedScroll upon initiating a scroll operation. In the case</span></span><br><span class="line"><span class="comment"> * of a touch scroll this corresponds to the initial &#123;<span class="doctag">@link</span> MotionEvent#ACTION_DOWN&#125;.</span></span><br><span class="line"><span class="comment"> * In the case of touch scrolling the nested scroll will be terminated automatically in</span></span><br><span class="line"><span class="comment"> * the same manner as &#123;<span class="doctag">@link</span> ViewParent#requestDisallowInterceptTouchEvent(boolean)&#125;.</span></span><br><span class="line"><span class="comment"> * In the event of programmatic scrolling the caller must explicitly call</span></span><br><span class="line"><span class="comment"> * &#123;<span class="doctag">@link</span> #stopNestedScroll()&#125; to indicate the end of the nested scroll.&lt;/p&gt;</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * &lt;p&gt;If &lt;code&gt;startNestedScroll&lt;/code&gt; returns true, a cooperative parent was found.</span></span><br><span class="line"><span class="comment"> * If it returns false the caller may ignore the rest of this contract until the next scroll.</span></span><br><span class="line"><span class="comment"> * Calling startNestedScroll while a nested scroll is already in progress will return true.&lt;/p&gt;</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * &lt;p&gt;At each incremental step of the scroll the caller should invoke</span></span><br><span class="line"><span class="comment"> * &#123;<span class="doctag">@link</span> #dispatchNestedPreScroll(int, int, int[], int[]) dispatchNestedPreScroll&#125;</span></span><br><span class="line"><span class="comment"> * once it has calculated the requested scrolling delta. If it returns true the nested scrolling</span></span><br><span class="line"><span class="comment"> * parent at least partially consumed the scroll and the caller should adjust the amount it</span></span><br><span class="line"><span class="comment"> * scrolls by.&lt;/p&gt;</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * &lt;p&gt;After applying the remainder of the scroll delta the caller should invoke</span></span><br><span class="line"><span class="comment"> * &#123;<span class="doctag">@link</span> #dispatchNestedScroll(int, int, int, int, int[]) dispatchNestedScroll&#125;, passing</span></span><br><span class="line"><span class="comment"> * both the delta consumed and the delta unconsumed. A nested scrolling parent may treat</span></span><br><span class="line"><span class="comment"> * these values differently. See &#123;<span class="doctag">@link</span> ViewParent#onNestedScroll(View, int, int, int, int)&#125;.</span></span><br><span class="line"><span class="comment"> * &lt;/p&gt;</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@param</span> axes Flags consisting of a combination of &#123;<span class="doctag">@link</span> #SCROLL_AXIS_HORIZONTAL&#125; and/or</span></span><br><span class="line"><span class="comment"> *             &#123;<span class="doctag">@link</span> #SCROLL_AXIS_VERTICAL&#125;.</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@return</span> true if a cooperative parent was found and nested scrolling has been enabled for</span></span><br><span class="line"><span class="comment"> *         the current gesture.</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@see</span> #stopNestedScroll()</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@see</span> #dispatchNestedPreScroll(int, int, int[], int[])</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@see</span> #dispatchNestedScroll(int, int, int, int, int[])</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"> <span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">startNestedScroll</span><span class="params">(<span class="keyword">int</span> axes)</span> </span>&#123;</span><br><span class="line">     <span class="keyword">if</span> (hasNestedScrollingParent()) &#123;</span><br><span class="line">         <span class="comment">// Already in progress</span></span><br><span class="line">         <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">     &#125;</span><br><span class="line">     <span class="keyword">if</span> (isNestedScrollingEnabled()) &#123;</span><br><span class="line">         ViewParent p = getParent();</span><br><span class="line">         View child = <span class="keyword">this</span>;</span><br><span class="line">         <span class="keyword">while</span> (p != <span class="keyword">null</span>) &#123;</span><br><span class="line">             <span class="keyword">try</span> &#123;</span><br><span class="line">                 <span class="keyword">if</span> (p.onStartNestedScroll(child, <span class="keyword">this</span>, axes)) &#123;</span><br><span class="line">                     mNestedScrollingParent = p;</span><br><span class="line">                     p.onNestedScrollAccepted(child, <span class="keyword">this</span>, axes);</span><br><span class="line">                     <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">                 &#125;</span><br><span class="line">             &#125; <span class="keyword">catch</span> (AbstractMethodError e) &#123;</span><br><span class="line">                 Log.e(VIEW_LOG_TAG, <span class="string">&quot;ViewParent &quot;</span> + p + <span class="string">&quot; does not implement interface &quot;</span> +</span><br><span class="line">                         <span class="string">&quot;method onStartNestedScroll&quot;</span>, e);</span><br><span class="line">                 <span class="comment">// Allow the search upward to continue</span></span><br><span class="line">             &#125;</span><br><span class="line">             <span class="keyword">if</span> (p <span class="keyword">instanceof</span> View) &#123;</span><br><span class="line">                 child = (View) p;</span><br><span class="line">             &#125;</span><br><span class="line">             p = p.getParent();</span><br><span class="line">         &#125;</span><br><span class="line">     &#125;</span><br><span class="line">     <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line"> &#125;</span><br></pre></td></tr></table></figure>
+<p>注释说的很清楚了。。<br>axes:  <code>SCROLL_AXIS_HORIZONTAL</code>和<code>SCROLL_AXIS_VERTICAL</code>的值之一。</p>
+<p>返回值 :  如果父控件可以响应嵌套滑动并且是enabled状态就返回true</p>
+<p>在Action_DWON和onInterceptTouchEvent中调用，表示嵌套滑动的开始，从代码来看，做的仅仅是一直getParent()，如果父类的<code>onStartNestedScroll()</code>返回true,就接着调用<code>onNestedScrollAccepted()</code>进行初始化，否则继续向上寻找，没找到返回false。</p>
+<p>后续应该调用  dispatchNestedPreScroll() ,如果它返回 true 则表示父控件至少消耗的部分或者全部的滑动距离</p>
+<p>接着应该调用 dispatchNestedScroll() , 自己处理后再返回给父控件去处理。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">  * 在子控件消耗任何部分的滑动之前分发嵌套滑动，这个方法给父控件提供了预先处理的机会</span></span><br><span class="line"><span class="comment">  * <span class="doctag">@param</span> dx Horizontal scroll distance in pixels</span></span><br><span class="line"><span class="comment">  * <span class="doctag">@param</span> dy Vertical scroll distance in pixels</span></span><br><span class="line"><span class="comment">  * <span class="doctag">@param</span> consumed 用于输出的数组。如果不为空，consumed[0]会包含dx的消耗值，consumed[1]是dy的消耗值</span></span><br><span class="line"><span class="comment">  * <span class="doctag">@param</span> offsetInWindow 可选，如果不为空，则返回的值是view在这个方法操作前后的坐标的插值。View可能会用这个值来调整输入坐标值</span></span><br><span class="line"><span class="comment">  * <span class="doctag">@return</span> 只要父控件消耗了滑动的坐标就会返回true </span></span><br><span class="line"><span class="comment">  */</span></span><br><span class="line"> <span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">dispatchNestedPreScroll</span><span class="params">(<span class="keyword">int</span> dx, <span class="keyword">int</span> dy,</span></span></span><br><span class="line"><span class="function"><span class="params">         <span class="meta">@Nullable</span> <span class="meta">@Size(2)</span> <span class="keyword">int</span>[] consumed, <span class="meta">@Nullable</span> <span class="meta">@Size(2)</span> <span class="keyword">int</span>[] offsetInWindow)</span> </span>&#123;</span><br><span class="line">     <span class="keyword">if</span> (isNestedScrollingEnabled() &amp;&amp; mNestedScrollingParent != <span class="keyword">null</span>) &#123;</span><br><span class="line">         <span class="keyword">if</span> (dx != <span class="number">0</span> || dy != <span class="number">0</span>) &#123;</span><br><span class="line">             <span class="keyword">int</span> startX = <span class="number">0</span>;</span><br><span class="line">             <span class="keyword">int</span> startY = <span class="number">0</span>;</span><br><span class="line">             <span class="keyword">if</span> (offsetInWindow != <span class="keyword">null</span>) &#123;</span><br><span class="line">                 getLocationInWindow(offsetInWindow);</span><br><span class="line">                 startX = offsetInWindow[<span class="number">0</span>];</span><br><span class="line">                 startY = offsetInWindow[<span class="number">1</span>];</span><br><span class="line">             &#125;</span><br><span class="line"></span><br><span class="line">             <span class="keyword">if</span> (consumed == <span class="keyword">null</span>) &#123;</span><br><span class="line">                 <span class="keyword">if</span> (mTempNestedScrollConsumed == <span class="keyword">null</span>) &#123;</span><br><span class="line">                     mTempNestedScrollConsumed = <span class="keyword">new</span> <span class="keyword">int</span>[<span class="number">2</span>];</span><br><span class="line">                 &#125;</span><br><span class="line">                 consumed = mTempNestedScrollConsumed;</span><br><span class="line">             &#125;</span><br><span class="line">             consumed[<span class="number">0</span>] = <span class="number">0</span>;</span><br><span class="line">             consumed[<span class="number">1</span>] = <span class="number">0</span>;</span><br><span class="line">             mNestedScrollingParent.onNestedPreScroll(<span class="keyword">this</span>, dx, dy, consumed);</span><br><span class="line"></span><br><span class="line">             <span class="keyword">if</span> (offsetInWindow != <span class="keyword">null</span>) &#123;</span><br><span class="line">                 getLocationInWindow(offsetInWindow);</span><br><span class="line">                 offsetInWindow[<span class="number">0</span>] -= startX;</span><br><span class="line">                 offsetInWindow[<span class="number">1</span>] -= startY;</span><br><span class="line">             &#125;</span><br><span class="line">             <span class="keyword">return</span> consumed[<span class="number">0</span>] != <span class="number">0</span> || consumed[<span class="number">1</span>] != <span class="number">0</span>;</span><br><span class="line">         &#125; <span class="keyword">else</span> <span class="keyword">if</span> (offsetInWindow != <span class="keyword">null</span>) &#123;</span><br><span class="line">             offsetInWindow[<span class="number">0</span>] = <span class="number">0</span>;</span><br><span class="line">             offsetInWindow[<span class="number">1</span>] = <span class="number">0</span>;</span><br><span class="line">         &#125;</span><br><span class="line">     &#125;</span><br><span class="line">     <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line"> &#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"> <span class="comment">/**</span></span><br><span class="line"><span class="comment">  * 在子控件消耗任何部分的滑动的时候 分发嵌套滑动，这个方法给父控件提供了后处理的机会，逻辑和上面类似</span></span><br><span class="line"><span class="comment">  */</span></span><br><span class="line"> <span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">dispatchNestedScroll</span><span class="params">(<span class="keyword">int</span> dxConsumed, <span class="keyword">int</span> dyConsumed,</span></span></span><br><span class="line"><span class="function"><span class="params">         <span class="keyword">int</span> dxUnconsumed, <span class="keyword">int</span> dyUnconsumed, <span class="meta">@Nullable</span> <span class="meta">@Size(2)</span> <span class="keyword">int</span>[] offsetInWindow)</span> </span>&#123;</span><br><span class="line">     <span class="keyword">if</span> (isNestedScrollingEnabled() &amp;&amp; mNestedScrollingParent != <span class="keyword">null</span>) &#123;</span><br><span class="line">         <span class="keyword">if</span> (dxConsumed != <span class="number">0</span> || dyConsumed != <span class="number">0</span> || dxUnconsumed != <span class="number">0</span> || dyUnconsumed != <span class="number">0</span>) &#123;</span><br><span class="line">             <span class="keyword">int</span> startX = <span class="number">0</span>;</span><br><span class="line">             <span class="keyword">int</span> startY = <span class="number">0</span>;</span><br><span class="line">             <span class="keyword">if</span> (offsetInWindow != <span class="keyword">null</span>) &#123;</span><br><span class="line">                 getLocationInWindow(offsetInWindow);</span><br><span class="line">                 startX = offsetInWindow[<span class="number">0</span>];</span><br><span class="line">                 startY = offsetInWindow[<span class="number">1</span>];</span><br><span class="line">             &#125;</span><br><span class="line"></span><br><span class="line">             mNestedScrollingParent.onNestedScroll(<span class="keyword">this</span>, dxConsumed, dyConsumed,</span><br><span class="line">                     dxUnconsumed, dyUnconsumed);</span><br><span class="line"></span><br><span class="line">             <span class="keyword">if</span> (offsetInWindow != <span class="keyword">null</span>) &#123;</span><br><span class="line">                 getLocationInWindow(offsetInWindow);</span><br><span class="line">                 offsetInWindow[<span class="number">0</span>] -= startX;</span><br><span class="line">                 offsetInWindow[<span class="number">1</span>] -= startY;</span><br><span class="line">             &#125;</span><br><span class="line">             <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">         &#125; <span class="keyword">else</span> <span class="keyword">if</span> (offsetInWindow != <span class="keyword">null</span>) &#123;</span><br><span class="line">             <span class="comment">// No motion, no dispatch. Keep offsetInWindow up to date.</span></span><br><span class="line">             offsetInWindow[<span class="number">0</span>] = <span class="number">0</span>;</span><br><span class="line">             offsetInWindow[<span class="number">1</span>] = <span class="number">0</span>;</span><br><span class="line">         &#125;</span><br><span class="line">     &#125;</span><br><span class="line">     <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line"> &#125;</span><br></pre></td></tr></table></figure>
+<h2 id="使用"><a href="#使用" class="headerlink" title="使用"></a>使用</h2><p>上面说的断断续续，其实用起来很容易。</p>
+<h3 id="NestedScrollingChild-1"><a href="#NestedScrollingChild-1" class="headerlink" title="NestedScrollingChild"></a>NestedScrollingChild</h3><p>对于 NestedScrollingChild 来说，它需要做的是 ：</p>
+<ol>
+<li>setNestedScrollingEnabled()设置为true</li>
+<li>在ACTION_DOWN中调用 startNestedScroll()</li>
+<li>在ACTION_MOVE中调用 dispatchNestedPreScroll() 和 dispatchNestedScroll()</li>
+<li>在ACTOPN_UP|ACTION_CANCEL 中看情况调用 stopNestedScroll()</li>
+</ol>
+<p>在sdk21之后，View类里面 onTouchEvent() 默认实现了这些步骤，如果不需要重写 onTouchEvent() 的话，本身就是支持这个功能的，如果重写的话，则需要自己看情况加入这些流程的调用。具体的例子可以看 RecyclerView 。作为support包的类，为了兼容性它自己实现了NestedScrollingChild接口，其实也就是调用 NestedScrollingChildHelper 类的相关方法，逻辑和sdk21之后的View的默认实现是类似的。</p>
+<h3 id="NestedScrollingParent-1"><a href="#NestedScrollingParent-1" class="headerlink" title="NestedScrollingParent"></a>NestedScrollingParent</h3><p>对于 NestedScrollingParent 来说，它需要做的就是 重写onXXXScroll()方法 ，这个根据不同的控件会有不同的效果，都需要自己去实现，对于sdk21之后的ViewGroup,提供了默认实现，就是直接调用 View的默认实现  dispatchNestedPreScroll() 和 dispatchNestedScroll() 继续向父控件分发，不满足条件则直接返回false,什么也不做。具体的例子可以看 ActionBarOverlayLayout 这个类，不过鉴于这个类不是很熟悉，可以看 ScrollView,SwipeRefreshLayout ，但这两个类都不仅仅可以作为 NestedScrollingParent，也可以作为NestedScrollingChild，看的时候不要弄混了。还有个 CoordinatorLayout，这个又做了一层封装，可以自己选择哪个类把。</p>
+<p>后面有空可以自己实现一个来看看效果</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2018/09/01/Android%E6%8E%A7%E4%BB%B6-ListView%E9%98%85%E8%AF%BB/" rel="prev" title="Android控件-ListView阅读">
+      <i class="fa fa-chevron-left"></i> Android控件-ListView阅读
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2018/09/05/Android%E6%8E%A7%E4%BB%B6-RecyclerView/" rel="next" title="Android控件-RecyclerView">
+      Android控件-RecyclerView <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8E%9F%E7%90%86"><span class="nav-number">1.</span> <span class="nav-text">原理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BB%E8%A6%81%E7%B1%BB%E5%92%8C%E6%96%B9%E6%B3%95"><span class="nav-number">2.</span> <span class="nav-text">主要类和方法</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#NestedScrollingChild"><span class="nav-number">2.1.</span> <span class="nav-text">NestedScrollingChild</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#NestedScrollingParent"><span class="nav-number">2.2.</span> <span class="nav-text">NestedScrollingParent</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%BA%90%E7%A0%81"><span class="nav-number">3.</span> <span class="nav-text">源码</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8"><span class="nav-number">4.</span> <span class="nav-text">使用</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#NestedScrollingChild-1"><span class="nav-number">4.1.</span> <span class="nav-text">NestedScrollingChild</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#NestedScrollingParent-1"><span class="nav-number">4.2.</span> <span class="nav-text">NestedScrollingParent</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="不侯鸟"
+      src="/images/avatar.gif">
+  <p class="site-author-name" itemprop="name">不侯鸟</p>
+  <div class="site-description" itemprop="description">学习总结</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">49</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">6</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/nangonghuang" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;nangonghuang" rel="noopener" target="_blank"><i class="github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://weibo.com/jzlandon/" title="Weibo → https:&#x2F;&#x2F;weibo.com&#x2F;jzlandon&#x2F;" rel="noopener" target="_blank"><i class="weibo fa-fw"></i>Weibo</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="http://powman.org/" title="http:&#x2F;&#x2F;powman.org&#x2F;" rel="noopener" target="_blank">angryPowman</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">不侯鸟</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

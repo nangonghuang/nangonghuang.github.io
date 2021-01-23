@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"right","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="原文是 RecyclerView 的作者写的，解释了这个控件里面的一些概念。这里翻译一下(注意这是旧的源码，例如新的版本中layout分成了三步而不是两步，大致是把这里提到的prelayout拆分成了step1和step2)">
+<meta property="og:type" content="article">
+<meta property="og:title" content="翻译--RecyclerView Animations">
+<meta property="og:url" content="http://example.com/2018/09/12/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/index.html">
+<meta property="og:site_name" content="Last Order">
+<meta property="og:description" content="原文是 RecyclerView 的作者写的，解释了这个控件里面的一些概念。这里翻译一下(注意这是旧的源码，例如新的版本中layout分成了三步而不是两步，大致是把这里提到的prelayout拆分成了step1和step2)">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://example.com/2018/09/12/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/trans_man_default.gif">
+<meta property="og:image" content="http://example.com/2018/09/12/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/trans_man_default.gif">
+<meta property="og:image" content="http://example.com/2018/09/12/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/pre-layout.jpg">
+<meta property="og:image" content="http://example.com/2018/09/12/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/post-layout.jpg">
+<meta property="og:image" content="http://example.com/2018/09/12/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/predictive_animations.gif">
+<meta property="og:image" content="http://example.com/2018/09/12/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/layout_transition_add.gif">
+<meta property="og:image" content="http://example.com/2018/09/12/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/add_post_layout_with_frame.png">
+<meta property="og:image" content="http://example.com/2018/09/12/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/predictive_add.gif">
+<meta property="og:image" content="http://example.com/2018/09/12/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/predictive_animations.gif">
+<meta property="article:published_time" content="2018-09-12T02:11:35.000Z">
+<meta property="article:modified_time" content="2018-11-05T14:45:25.575Z">
+<meta property="article:author" content="不侯鸟">
+<meta property="article:tag" content="列表控件">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/2018/09/12/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/trans_man_default.gif">
+
+<link rel="canonical" href="http://example.com/2018/09/12/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>翻译--RecyclerView Animations | Last Order</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Last Order</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">逐渐沦为面试准备博客。。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2018/09/12/%E7%BF%BB%E8%AF%91-RecyclerView-Animations/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="不侯鸟">
+      <meta itemprop="description" content="学习总结">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Last Order">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          翻译--RecyclerView Animations
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-09-12 10:11:35" itemprop="dateCreated datePublished" datetime="2018-09-12T10:11:35+08:00">2018-09-12</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2018-11-05 22:45:25" itemprop="dateModified" datetime="2018-11-05T22:45:25+08:00">2018-11-05</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/android-app/" itemprop="url" rel="index"><span itemprop="name">android_app</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><a target="_blank" rel="noopener" href="https://www.birbit.com/recyclerview-animations-part-1-how-animations-work">原文</a>是 RecyclerView 的作者写的，解释了这个控件里面的一些概念。这里翻译一下(注意这是旧的源码，例如新的版本中layout分成了三步而不是两步，大致是把这里提到的prelayout拆分成了step1和step2)</p>
+<a id="more"></a>
+
+<h2 id="第一部分"><a href="#第一部分" class="headerlink" title="第一部分"></a>第一部分</h2><p>ListView 是Android里面最受欢迎的控件之一，即使它有许多的功能和特性，但是使用起来非常复杂并且很难自定义。随着UI的进化和手机的发展，这个缺点开始越来越明显。通过实现一些简单的约定，我们可以控制很多行为：</p>
+<ol>
+<li>items是怎么布局的</li>
+<li>动画</li>
+<li>item 装饰</li>
+<li>回收策略<br>…</li>
+</ol>
+<p>当然，这种灵活性的代价也伴随着更复杂的类结构，同时，也有更多的东西需要学习。</p>
+<p>在这片文章里面，我将会深入RecyclerView的内部细节，特别是动画是怎么运作的。</p>
+<p>在 Honeycomb 版本的时候，Android Framework 引入了 LayoutTransition 动画，它可以非常容易的把 ViewGroup 内部的的变化通过动画表现出来。 它工作的方式是在ViewGroup布局变化的前后分别取一个快照，然后创造一个动画集合来表示这两种状态的变化过程。这种方式和RecycleView对Adapter的变化所执行的动画的原理是类似的。</p>
+<p><img src="%E7%BF%BB%E8%AF%91-RecyclerView-Animations/trans_man_default.gif" alt="LayoutTransirion example"></p>
+<p>不幸的是，LayoutTransitions动画和list有点不兼容，主要是list里面的子条目和ViewGroup里面的子view不一样。用对views使用的这一套动画机制去对items使用时，理解这个区别非常重要。</p>
+<p>在正常的ViewGroup中，如果一个view是刚被添加到视图树的，那么它就可以被当作新添加的view然后执行相应的动画(比如淡入效果).对于视图集合来说，情况有点不一样。 比如，一个子条目的view变的可见可能是因为它前面的某个子条目被从adapter中移出了。在这种情况下，为新的item 执行一个淡入动画可能会导致一些误解，因为它本来就是在list中的，虽然这个view是刚刚在屏幕中可见。RecyclerView知道这个item是不是新添加的，但是如果item不是新添加的，它就不知道这个item之前在哪里(注:意思是没有缓存view的引用？)。同样的情况也发生在view消失的时候，RecyclerView不知道这个view会到那里去如果它没有被从Adapter中移出的话。</p>
+<p><img src="%E7%BF%BB%E8%AF%91-RecyclerView-Animations/trans_man_default.gif" alt="LayoutTransition failure for a list"></p>
+<p>为了解决这个问题，RecyclerView 可以向 LayoutManager 请求新出现的view 的之前的位置。虽然这样做可行，但这会需要在LayoutManager中存一些记录，并且对于一些更复杂的LayoutManager来说这些记录计算起来可能会很麻烦。</p>
+<p>RecyclerView用来处理item显示和消失动画(指对list中过去和现在一直都存在的items所对应的views执行出现和消失的动画)的方法是通过layoutManager来执行预布局逻辑。一方面来说，RecyclerView想要在这次变化之前知道这些view被布局在哪里，另一方面，如果LayoutManager把当前不可见的view布局出来，RecyclerView想要知道在这次变化之后这些view将会被布局到哪里。</p>
+<p>为了使 LayoutManager 更容易的提供这些信息，当adapter有应该执行动画的数据变化的时候，RecyclerView 通过两个步骤来处理。这两个步骤是：</p>
+<ol>
+<li>在第一步（preLayout阶段），RecyclerView 要求 LayoutManager依据额外的信息来局部之前的状态，对于上面的例子来说，这个意思是告诉它 “重新布局这些items,顺便说下，C已经被移除了”.LayoutManager 则正常运行布局过程，但是它知道C将会被移除掉，所以它会用view把C空出来的过程填充起来。这个过程中比较有趣的部分是，RecyclerView依然表现的好像C仍然在Adapter中一样，如果这时候LayoutManager请求在位置2的view,RecyclerView会返回C的view给它(getViewForPosition(2) == View(‘C’))，如果LayoutManager请求位置4的view，RecyclerView会返回E对应的view给它（虽然现在Adapter中D是第四个(注:这里好像有错？C移除后D是第三个了))，返回的view的LayoutParams有个isItemRemoved方法，LayoutManager可以用它来检查这个view是不是对应一个马上要消失的item。</li>
+<li>在第二步（postLayout阶段）,RecyclerView 会请求 LayoutManager 重新布局它的子条目。这一次“C”已经不在Adapter中了，getViewForPosition(2)会返回“D”，getViewForPosition(4)会返回“F”，记住，这时候子条目C已经从Adapter中移除了，但是因为RecyclerView仍然持有C对应的View的引用，所以它可以表现的仿佛C依然在一样。换句话说，RecyclerView也会对LayoutManager做记录</li>
+</ol>
+<p>每次LayoutManager调用onLayoutChildren的时候，它都会先暂时的detach掉所有的view然后再从scratch中取出来重新布局。没有变化的view会被scrap缓存中返回回来，它们的测量结果依然有效，所以对这种view的重新布局会相对简单。</p>
+<p><img src="%E7%BF%BB%E8%AF%91-RecyclerView-Animations/pre-layout.jpg" alt="pre-layout"><br>LinearLayoutManager preLayout的结果: (红色部分表示对用户可见的区域)* </p>
+<p><img src="%E7%BF%BB%E8%AF%91-RecyclerView-Animations/post-layout.jpg" alt="post-layout"><br>LinearLayoutManager postlayout的结果</p>
+<p>在这两个阶段过后，RecyclerView知道了View从哪里来，所以可以执行正确的动画。</p>
+<p><img src="%E7%BF%BB%E8%AF%91-RecyclerView-Animations/predictive_animations.gif" alt="Predictive Animation"></p>
+<p>你可能会问，C对应的View都没有被LayoutManager布局了，它怎么还是可见的？</p>
+<p>需要明确说明的是，在pre-layout阶段LayoutManager依然布局C的原因是它看起来仍然在Adapter，在post-layout阶段LayoutManager不布局的原因则是C的确不在Adapter里面了。对于LayoutManger来说C不再是它的子view了，但是对RecyclerView来说却不是这样。当一个view被从LayoutManager中移除的时候，如果 ItemAnimator想要它执行动画，RecyclerView会仍然把它作为一个子view(这样子动画才能够正常执行)。更多的细节在第二部分会描述。</p>
+<h3 id="消失子条目的处理"><a href="#消失子条目的处理" class="headerlink" title="消失子条目的处理"></a>消失子条目的处理</h3><p>在两个阶段执行以后，RecyclerView 可以正确的执行添加动画了，但现在还有个问题就是消失动画。考虑一下下面的情况，当一个新的item被添加到list中，会导致其他的一些子条目被挤出可见区域，动画过程如下：</p>
+<p><img src="%E7%BF%BB%E8%AF%91-RecyclerView-Animations/layout_transition_add.gif" alt="Predictive Animation"></p>
+<p>当X被添加到A之后的时候，会导致F被挤出屏幕外，因为LayoutManager不会布局F，所以LayoutTransition认为它被UI移除了然后执行一个淡出动画，实际上，F仍然在adapter中但是被推出了可见区域而已。</p>
+<p>为了解决这个问题，RecyclerView为Layoutmanager提供了一些额外的api来获取这些信息。在postlayout阶段的末尾，LayourManager可以调用getScrapList来获取出于这种情况下的view列表（没有被LayoutManager布局出来但是仍然在adapter中),然后它仍然会布局这些view,就好像RecyclerView很大可以容纳他们一样。</p>
+<p>LinearLayoutManager postLayout的结果: (红色部分表示对用户可见的区域)*<br><img src="%E7%BF%BB%E8%AF%91-RecyclerView-Animations/add_post_layout_with_frame.png" alt="Predictive Animation"></p>
+<p>一个重要的细节是，由于这些view在动画结束后就没必要存在了，LayoutManager会调用addDisappearingView而不是addView。这会告诉RecyclerView，这个view应该在动画结束后移除掉。这个view会被RecyclerView添加到hidden views，因此它会在这个方法调用结束后马上从LayoutManager的子view列表中移除掉。通过这种方式，LayoutManager可以清除掉它。</p>
+<p><img src="%E7%BF%BB%E8%AF%91-RecyclerView-Animations/predictive_add.gif" alt="Predictive Animation"></p>
+<p>刚开始的时候，你可能认为 LayoutManager 可以计算出 View 从哪里来或者要去哪里，这样子就不需要两个layout步骤来计算了。不幸的是，在同一个步骤中，如果adapter的多种类型发生变化，会有很多边界情况发生。对于一个更复杂的LayoutManager（比如StaggeredGridLayout)来说，计算一个Item放在哪个位置不是一件容易的事情，通过两步layout的方式可以为LayoutManager减轻很多压力并且能够很容易的支持合适的动画而不用花太多力气。</p>
+<p>目前位置，我已经提到了RecyclerView中预处理动画的原理的主要内容，但对于LayoutManager来说仍然有很多事情要做。你可以在第二部分了解到背后仍然需要做的事情。</p>
+<h2 id="第二部分"><a href="#第二部分" class="headerlink" title="第二部分"></a>第二部分</h2><ol>
+<li><p>RecyclerView 即使在一些child 被LayoutManager移除掉的时候依然保持它们的attached状态，具体的过程是什么？这样不会破坏RecyclerView和 LayoutManager 之间的状态吗？<br> 是的，在某种程度上的确有点这个意思，但是：</p>
+<p> RecyclerView 的确保留了它们作为ViewGroup的子view,但是把它们都对LayoutManager隐藏了，每次LayoutManager调用方法获取它们的children的时候，RecyclerView会把隐藏的view也考虑在内（是指考虑屏蔽）。让我们看一下part 1 中 C被移出adapter的例子：</p>
+<p> <img src="%E7%BF%BB%E8%AF%91-RecyclerView-Animations/predictive_animations.gif" alt="Predictive Animation"></p>
+<p> 在这里C淡出了，如果LayoutManager调用getChildCount(),RecyclerView会返回6虽然它有7个children,如果LayoutManager调用getChildAt(int),Recycler会进行合适的偏移来跳过C（或者任何隐藏的children）。如果LayoutManager调用addView(view,position),RecyclerView也会在ViewGroup调用addView之前进行适当的偏移。</p>
+<p> 当动画结束的时候，RecyclerView会移出这个View然后回收它</p>
+<p> 更多的细节你可以看ChildHelper这个内部类的实现</p>
+</li>
+<li><p>在Pre-layout阶段，RecyclerView对item的位置是怎么处理的？这时候item在Adapter中的位置不一样。<br> 这得益于adapter新增的特定事件的通知，当Adapter派发notify xx 事件的时候，RecyclerView会记录它们并且为这个变化请求一次布局，在下一个布局阶段之前到来的事件都会在一起执行。</p>
+<p> 当onLayout被系统调用的时候，RecyclerView执行以下步骤：</p>
+<ol>
+<li><p>对这些事件重新排序，把move事件放到事件list的末尾。移动move事件到结尾仅仅是一个简化步骤，因此这里不打算讨论它的细节。你可以在OpReorderer类中找到感兴趣的细节。 </p>
+</li>
+<li><p>按顺序一个一个处理事件，并且更新已经存在的ViewHolder的位置。如果一个ViewHolder被移除掉，它也会被标记为移除状态。当这么做的时候，RecyclerView也会决定adapter数据的变化是不是要在preLayout步骤之前或者之后分发给LayoutManager,这个过程如下：</p>
+<ul>
+<li>如果是一个add操作，它会被延期执行因为item不应该在preLayout阶段存在。</li>
+<li>如果是一个update或者remove操作并且这个操作会影响到已经存在的ViewHolder，这个操作会被推迟执行。如果这个操作不会影响到已经存在的ViewHolder,它就会被分发到LayoutManager，这是因为RecyclerView不能复现这个item之前的状态（它没有代表这个item之前的状态的ViewHolder）</li>
+<li>如果是一个move操作，它会被延期执行因为RecyclerView可以在prelayout阶段弄一个假的位置。比如，如果把位置3的item移动到位置5，在prelayout阶段如果位置3的view被请求的话，RecyclerView返回位置5的view</li>
+<li>RecyclerView会在必要的时候重写这些操作。比如，一个更新或者删除操作影响到了一些ViewHolder,RecyclerView会拆分这些操作。如果一个操作应该被分发给LayoutManager但是一个延迟的操作会影响它，RecyclerView会重排序这些操作使它们依然是一致的。</li>
+</ul>
+</li>
+<li><p>比如说，如果有一个在位置3添加1的操作，这个操作被延迟了，紧接着有一个不能被延迟的删除位置5的1的操作，RecyclerView会把删除位置4的1分发给LayoutManager，这么做是因为Adapter在添加1到位置3之后执行删除位置5的1并且通知它。因此RecyclerView没有告诉layoutManager关于添加1到位置3的事情，它重写了remove操作来保证一致。</p>
+<p>这种做法使得对于layoutManager来说追踪一个item会很容易。adapter和layoutManager之间的抽象关系使得这一切称为可能，因此ReclcyclerView不需要把Adapter的引用传给layoutManager,相反的，RecyclerView提供了一些通过State和Recycler类来接触Adapter的方法。</p>
+<p>ViewHolders也有它们自己的旧位置，prelayout位置和最终adpater位置。当viewHolder.getPosition被调用的时候，它们会返回prelayout位置或者最终adapter位置，这取决于当时处在layout的哪个状态（pre 还是post).LayoutManager不需要知道这些因为它总是保持和之前的分发给它的事件保持一致。</p>
+</li>
+<li><p>在Adapter的更新处理完后，RecyclerView保存已经存在的View的位置和大小信息并在之后把它们用于动画。</p>
+</li>
+<li><p>RecyclerView在preLayout阶段会调用LayoutManager.onLayoutChildren，在上一段中提到过，layoutmanager会执行它的正常layout逻辑，它要做的就是为更多的比如正在删除或者变化的item(isItemRemoved,isItemChanged)进行布局，删除的或者变化的item依然出现在Adapter提供给LayoutManager的api中。这种情况下，layoutManager仅仅是把它们当作普通的view来处理</p>
+</li>
+<li><p>在pre-layout结束后，RecyclerView再次记录这些view的位置信息然后把剩下的Adapter 更新分发给LayoutManager.</p>
+</li>
+<li><p>RecyclerView 再次调用layoutManager的 onLayout（postLayout阶段），这一次，在postlayout结束后，所有的item的位置都会和adapter中的数据一致，layoutManager再次执行正常的布局逻辑</p>
+</li>
+<li><p>postLayout结束后，RecycerView再次检查view的位置信息，然后决定哪些item是add,remove,changed,moved.它会隐藏掉remove的view,并且把没有添加到LayoutManager的view添加到RecyclerView（因为要执行动画）.</p>
+</li>
+<li><p>要执行动画的items会被传给ItemAnimator来开始动画效果。动画结束后，Item Animator调用一个回调告诉RecyclerView移除和回收不再需要的view</p>
+</li>
+</ol>
+</li>
+</ol>
+<ol start="3">
+<li><p>如果LayoutManager 在内部数据结构中使用item 的位置信息会发生什么？ </p>
+<p> 因为RecyclerView会重写adapter的变化，layoutManager要做的就是当一个adapter数据变化的回调到来的时候更新它自己的记录。RecyclerView保证这些更新会在合适的时机以合适的顺序调用。</p>
+<p> 在layout的任何时间点，如果layoutManager想要获取Adapter的一些额外数据，它可以调用Recycler.convertPreLayoutPositionToPostLayout来获取item在adapter中的位置。比如，GridLayoutManager就使用了这个接口来获取item的信息。</p>
+</li>
+<li><p>notifyDataSetChanged 被调用的时候会发生什么?预处理动画会执行吗？</p>
+<p> 不会，这是为什么notifyDataSetChanged应该是你最后才考虑调用的方法。当notifyDataSetChanged调用的时候，RecyclerView无法知道items移动到哪里去了因此它没法正确的模拟getViewForPosition的调用。此时它仅仅是执行一个普通布局容器动画将会做的事情</p>
+</li>
+</ol>
+<h2 id="第三部分-这里是我自己加的"><a href="#第三部分-这里是我自己加的" class="headerlink" title="第三部分( 这里是我自己加的 )"></a>第三部分( 这里是我自己加的 )</h2><ol>
+<li><p>为什么要执行多次layout ?<br> 为了正确的执行动画，所以必须知道条目的信息，包括数据改变之前和之后的，主要是记录position对应的holder和 RecyclerView.State，对于默认的实现DefaultAnimation()来说，主要是用到了top和left，translationX等，可见SimpleAnimation类的animateChange()方法，对于之前的，为什么不直接拿当前的信息呢？只能猜测是为了要recyclerview最初的状态，当前状态可能是用户交互过的，view的信息可能已经变化了，在step1中完成 ，对于之后的，就是拿新数据layout更新一次可以拿到，在step2中完成。</p>
+</li>
+<li><p>notifyItemXXX 和 notifyDataSetChanged 的区别？<br> 主要区别还是在于执行动画，对于notifyDataSetChanged，一般来说不执行动画(Recyclerview的dispatchLayoutStep1中做的判断），而对于 notifyItemXXX ，则根据 item变化的类型决定是不是要执行动画，此时RecyclerView其实也并不知道data数据集哪里变化了，需要开发者主动去告诉它，哪个item insert,remove等等，如果你在data list尾部插入数据，然后notifyItemInsert(0),这时候数据也会错乱，RecyclerView会误认为data list的0位置是新插入的数据，然后生成位置0对应的view,插入进去。。</p>
+</li>
+</ol>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E5%88%97%E8%A1%A8%E6%8E%A7%E4%BB%B6/" rel="tag"># 列表控件</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2018/09/10/Android%E6%8E%A7%E4%BB%B6-RecyclerView2-ItemDecoration/" rel="prev" title="Android控件-RecyclerView2-ItemDecoration">
+      <i class="fa fa-chevron-left"></i> Android控件-RecyclerView2-ItemDecoration
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2018/09/17/Android%E6%8E%A7%E4%BB%B6-RecyclerView3-%E7%BC%93%E5%AD%98/" rel="next" title="Android控件-RecyclerView3-缓存">
+      Android控件-RecyclerView3-缓存 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%80%E9%83%A8%E5%88%86"><span class="nav-number">1.</span> <span class="nav-text">第一部分</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B6%88%E5%A4%B1%E5%AD%90%E6%9D%A1%E7%9B%AE%E7%9A%84%E5%A4%84%E7%90%86"><span class="nav-number">1.1.</span> <span class="nav-text">消失子条目的处理</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%BA%8C%E9%83%A8%E5%88%86"><span class="nav-number">2.</span> <span class="nav-text">第二部分</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%89%E9%83%A8%E5%88%86-%E8%BF%99%E9%87%8C%E6%98%AF%E6%88%91%E8%87%AA%E5%B7%B1%E5%8A%A0%E7%9A%84"><span class="nav-number">3.</span> <span class="nav-text">第三部分( 这里是我自己加的 )</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="不侯鸟"
+      src="/images/avatar.gif">
+  <p class="site-author-name" itemprop="name">不侯鸟</p>
+  <div class="site-description" itemprop="description">学习总结</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">49</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">6</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/nangonghuang" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;nangonghuang" rel="noopener" target="_blank"><i class="github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://weibo.com/jzlandon/" title="Weibo → https:&#x2F;&#x2F;weibo.com&#x2F;jzlandon&#x2F;" rel="noopener" target="_blank"><i class="weibo fa-fw"></i>Weibo</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="http://powman.org/" title="http:&#x2F;&#x2F;powman.org&#x2F;" rel="noopener" target="_blank">angryPowman</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">不侯鸟</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

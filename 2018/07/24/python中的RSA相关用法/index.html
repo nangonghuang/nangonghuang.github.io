@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"right","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="工作需要，用到了RSA算法，因为是python+flask搭建的服务器，所以也需要使用RSA相关的功能，但是网上搜了一圈，大都是在说 rsa 和 pycryptodome 这两个库。主要问题在于，我拿到的是string格式的公匙，而不是.pem文件，卡在了生产public key这个阶段。。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="python中的RSA相关用法">
+<meta property="og:url" content="http://example.com/2018/07/24/python%E4%B8%AD%E7%9A%84RSA%E7%9B%B8%E5%85%B3%E7%94%A8%E6%B3%95/index.html">
+<meta property="og:site_name" content="Last Order">
+<meta property="og:description" content="工作需要，用到了RSA算法，因为是python+flask搭建的服务器，所以也需要使用RSA相关的功能，但是网上搜了一圈，大都是在说 rsa 和 pycryptodome 这两个库。主要问题在于，我拿到的是string格式的公匙，而不是.pem文件，卡在了生产public key这个阶段。。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2018-07-23T18:03:20.000Z">
+<meta property="article:modified_time" content="2018-11-04T06:05:31.656Z">
+<meta property="article:author" content="不侯鸟">
+<meta property="article:tag" content="RSA">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://example.com/2018/07/24/python%E4%B8%AD%E7%9A%84RSA%E7%9B%B8%E5%85%B3%E7%94%A8%E6%B3%95/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>python中的RSA相关用法 | Last Order</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Last Order</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">逐渐沦为面试准备博客。。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2018/07/24/python%E4%B8%AD%E7%9A%84RSA%E7%9B%B8%E5%85%B3%E7%94%A8%E6%B3%95/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="不侯鸟">
+      <meta itemprop="description" content="学习总结">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Last Order">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          python中的RSA相关用法
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-07-24 02:03:20" itemprop="dateCreated datePublished" datetime="2018-07-24T02:03:20+08:00">2018-07-24</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2018-11-04 14:05:31" itemprop="dateModified" datetime="2018-11-04T14:05:31+08:00">2018-11-04</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/python/" itemprop="url" rel="index"><span itemprop="name">python</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>工作需要，用到了RSA算法，因为是python+flask搭建的服务器，所以也需要使用RSA相关的功能，但是网上搜了一圈，大都是在说 rsa 和 pycryptodome 这两个库。主要问题在于，我拿到的是string格式的公匙，而不是.pem文件，卡在了生产public key这个阶段。。<a id="more"></a></p>
+<p>虽然 <a target="_blank" rel="noopener" href="https://nangonghuang.github.io/2018/07/30/RSA%E5%8A%A0%E8%A7%A3%E5%AF%86%E7%AE%97%E6%B3%95%E5%8E%9F%E7%90%86/">RSA原理</a> 大致看了一遍，但是实际使用的时候还涉及到key的生成和解析，加解密数据的填充等等，实际的使用中需要客户端和服务器统一RSA加密所用的填充方式。</p>
+<hr>
+<p>RSA加密常用的填充方式有下面3种：</p>
+<p>1.RSA_PKCS1_PADDING 填充模式，最常用的模式</p>
+<p>在BouncyCastle实现RSA的PKCS1V1.5模式中，如果是公钥加密信息（forEncryption=true)，密钥长度为1024位，那么输出的密文块长度为128个字节，输入的明文块长度为127-10,即输入的明文块最大是117位，如果输入的明文块小于117位，比如输入的明文块长度为64位，那么会对这个明文块进行补位，在明文块前添加一位的0x02字节（代表公钥加密）然后后面的52位为随机的字节，在补位的最后一位，{即52（117-64-1），从零开始的},添加一位的字节0x00,在补位的后面添加实际的明文块。</p>
+<p>这样做的目的就是使得明文块转化成与module差不多的大整数。</p>
+<p>如果是私钥加密（forPrivateKey=true),密钥长度为1024位，那么输出 的密文块长度也是128字节，输入的明文块的长度为127-10，即输入的明文块最大是117位，如果输入的明文块小于117位，比如输入的明文块长度为64位，那么对这个明文块进行补位，在明文块前添加一位的0x01字节（代表私钥加密），然后在后面的52位为字节0xff，在最后一位｛即52（117-64-1）,从零开始)，添加一位的字节0x00，在补位的后面添加时间的明文块。</p>
+<p>根据这个要求，对于512bit的密钥，　block length = 512/8 – 11 = 53 字节</p>
+<p>2.RSA_PKCS1_OAEP_PADDING</p>
+<p>输入：RSA_size(rsa) – 41</p>
+<p>输出：和modulus一样长</p>
+<p>3.for RSA_NO_PADDING　　不填充</p>
+<p>输入：可以和RSA钥模长一样长，如果输入的明文过长，必须切割，　然后填充</p>
+<p>输出：和modulus一样长</p>
+<p>跟DES，AES一样，　RSA也是一个块加密算法（ block cipher algorithm），总是在一个固定长度的块上进行操作。</p>
+<p>但跟AES等不同的是，　block length是跟key length有关的。</p>
+<p>每次RSA加密的明文的长度是受RSA填充模式限制的，但是RSA每次加密的块长度就是key length。</p>
+<p>需要注意：</p>
+<p>假如你选择的秘钥长度为1024bit共128个byte：</p>
+<p>1.当你在客户端选择RSA_NO_PADDING填充模式时，如果你的明文不够128字节</p>
+<p>加密的时候会在你的明文前面，前向的填充零。解密后的明文也会包括前面填充的零，这是服务器需要注意把解密后的字段前向填充的</p>
+<p>零去掉，才是真正之前加密的明文。</p>
+<p>2.当你选择RSA_PKCS1_PADDING填充模式时，如果你的明文不够128字节</p>
+<p>加密的时候会在你的明文中随机填充一些数据，所以会导致对同样的明文每次加密后的结果都不一样。</p>
+<p>对加密后的密文，服务器使用相同的填充方式都能解密。解密后的明文也就是之前加密的明文。</p>
+<p>3.RSA_PKCS1_OAEP_PADDING填充模式没有使用过， 他是PKCS#1推出的新的填充方式，安全性是最高的，</p>
+<p>和前面RSA_PKCS1_PADDING的区别就是加密前的编码方式不一样。</p>
+<hr>
+<p>回到string类型公匙的问题上来。虽然加密密匙有多种格式，比如jar包里面的校验文件，中间还有什么乱七八糟的RSA PKCS#1,PKCS#8,X.509之类的东西与这里说的内容无关，暂时忽略掉。但我们在RSA里面通常遇到的公匙通常有两种类型，一种是.pem的文件，另外一种是纯string类型的公匙。大致的看过文档之后(官方文档的代码也有错误跑不起来，非常误导….), pycryptodome 和 rsa 库的getting started文档并没有很明确的说明，</p>
+<ol>
+<li><p>pem文件类型的公匙的两种格式：</p>
+ <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">-----BEGIN RSA PUBLIC KEY-----</span><br><span class="line">MIIBCgKCAQEAhU9EQ3z&#x2F;zNCH+68tTN6Vkhnq8jaCx+9iT+zfq6rmwGzdNcErkt8x</span><br><span class="line">gqD5iuuQmpnFtF0fM3aKyCdztbYcJcscggceg9Wf14Nu5xitWsG47Mpd4M13RIGX</span><br><span class="line">0p5lMuE2zI4x5YCUSsTLV9vNtRK73tnUq8HYcHrRCK+RmylRcXvyIDjpVcGbwT37</span><br><span class="line">MebFuufCGqo0rYfZl7bb4kDMgKk5gULGBDxc5tz7YktMXQ0FOa7g9WXsxIWmoy0q</span><br><span class="line">OUMZVyHY+55b8vGUT2EevqrpusrnUJvwYRTtTiHHU+ftSV3VwY+1g38CWTk148Lg</span><br><span class="line">UL0pIrnVxjPKUbUuoHA+YNbLL&#x2F;BLpJr7jwIDAQAB</span><br><span class="line">-----END RSA PUBLIC KEY-----</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p> 上面是一种类型的pem文件公匙的内容(这里可以叫做 标准pem 格式)，到具体的库来说，就是rsa库所产出的公匙：</p>
+ <figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> rsa</span><br><span class="line"></span><br><span class="line">(pubkey, privkey) = rsa.newkeys(<span class="number">2048</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 保存密钥</span></span><br><span class="line"><span class="keyword">with</span> <span class="built_in">open</span>(<span class="string">&#x27;public.pem&#x27;</span>,<span class="string">&#x27;w+&#x27;</span>) <span class="keyword">as</span> f:</span><br><span class="line">    f.write(pubkey.save_pkcs1().decode())</span><br><span class="line"></span><br><span class="line"><span class="keyword">with</span> <span class="built_in">open</span>(<span class="string">&#x27;private.pem&#x27;</span>,<span class="string">&#x27;w+&#x27;</span>) <span class="keyword">as</span> f:</span><br><span class="line">    f.write(privkey.save_pkcs1().decode())</span><br></pre></td></tr></table></figure>
+<p> 而crypto库产生的.pem文件格式为:(这里可以叫做 openssl 格式)</p>
+ <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">-----BEGIN PUBLIC KEY-----</span><br><span class="line">MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA59JFc2huRupfSvTmI96e</span><br><span class="line">VuAWRAIziNG&#x2F;sTm0Z+XvWqWFMk4s9WIAu9Pi1d1VKhhwJoUSZKdFvMtKxQ2nACOU</span><br><span class="line">u01ykiqKmxYpU2jgKrKdAuM4R9hMnp5eqN7ql1zg5PA&#x2F;cF07AM0nG&#x2F;Z2y6XZUSz8</span><br><span class="line">mnAv7F0ePf0Ba1CmUAk2r+VwxA2rvpR0HM87T2Qq8b3ZieUuCyp0bxtQmHcbSAEV</span><br><span class="line">ALHSucFxPVHKQ7b&#x2F;cjp5Teh4yWJnyhAOU8rphFY0fGehQpWsKTWTZFlxm+TEcH7c</span><br><span class="line">9mlFu290z0DE4xzYHv7kKWhConqJAphcNAExm7j&#x2F;qhvQF27DT90tj0oWtjz&#x2F;tCNj</span><br><span class="line">GQIDAQAB</span><br><span class="line">-----END PUBLIC KEY-----</span><br></pre></td></tr></table></figure>
+<p> 产生的方法则是:</p>
+ <figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> Crypto.Random <span class="keyword">import</span> get_random_bytes</span><br><span class="line"><span class="keyword">import</span> base64</span><br><span class="line"><span class="keyword">from</span> Crypto.Signature <span class="keyword">import</span> pkcs1_15</span><br><span class="line"><span class="keyword">from</span> Crypto.Hash <span class="keyword">import</span> SHA256,SHA1</span><br><span class="line"><span class="keyword">from</span> Crypto.PublicKey <span class="keyword">import</span> RSA</span><br><span class="line"></span><br><span class="line">key = RSA.generate(<span class="number">2048</span>)</span><br><span class="line">private_key = key.export_key()</span><br><span class="line">file_out = <span class="built_in">open</span>(<span class="string">&quot;private.pem&quot;</span>, <span class="string">&quot;wb&quot;</span>)</span><br><span class="line">file_out.write(private_key)</span><br><span class="line"></span><br><span class="line">public_key = key.publickey().export_key()</span><br><span class="line">file_out = <span class="built_in">open</span>(<span class="string">&quot;public.pem&quot;</span>, <span class="string">&quot;wb&quot;</span>)</span><br><span class="line">file_out.write(public_key)</span><br></pre></td></tr></table></figure>
+<p> 不过这两种pem格式，都是同一种构成规则，就是</p>
+ <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">前缀行</span><br><span class="line">对DER格式的公匙进行base64后的结果</span><br><span class="line">后缀行</span><br></pre></td></tr></table></figure></li>
+<li><p>DER格式的公匙：<br> DER格式的公匙，通常是byte字节流。我们所遇到的string类型的公匙，就是对这种字节流进行base64之后得到的字符串。而 openssl 格式 和 标准pem 格式 内容中所包含的 DER字节流，在没有前缀来区分的情况下，我们很难知道它是　openssl 格式 还是 标准pem 格式　中的那一段DER，而不同的类型，要用不同的处理方法来解析，这也是库方法解不出public key的最主要的原因之一。</p>
+<p> DER格式1:</p>
+ <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">MIIBCgKCAQEAhU9EQ3z&#x2F;zNCH+68tTN6Vkhnq8jaCx+9iT+zfq6rmwGzdNcErkt8x</span><br><span class="line">gqD5iuuQmpnFtF0fM3aKyCdztbYcJcscggceg9Wf14Nu5xitWsG47Mpd4M13RIGX</span><br><span class="line">0p5lMuE2zI4x5YCUSsTLV9vNtRK73tnUq8HYcHrRCK+RmylRcXvyIDjpVcGbwT37</span><br><span class="line">MebFuufCGqo0rYfZl7bb4kDMgKk5gULGBDxc5tz7YktMXQ0FOa7g9WXsxIWmoy0q</span><br><span class="line">OUMZVyHY+55b8vGUT2EevqrpusrnUJvwYRTtTiHHU+ftSV3VwY+1g38CWTk148Lg</span><br><span class="line">UL0pIrnVxjPKUbUuoHA+YNbLL&#x2F;BLpJr7jwIDAQAB</span><br></pre></td></tr></table></figure>
+<p> DER格式2：</p>
+ <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA59JFc2huRupfSvTmI96e</span><br><span class="line">VuAWRAIziNG&#x2F;sTm0Z+XvWqWFMk4s9WIAu9Pi1d1VKhhwJoUSZKdFvMtKxQ2nACOU</span><br><span class="line">u01ykiqKmxYpU2jgKrKdAuM4R9hMnp5eqN7ql1zg5PA&#x2F;cF07AM0nG&#x2F;Z2y6XZUSz8</span><br><span class="line">mnAv7F0ePf0Ba1CmUAk2r+VwxA2rvpR0HM87T2Qq8b3ZieUuCyp0bxtQmHcbSAEV</span><br><span class="line">ALHSucFxPVHKQ7b&#x2F;cjp5Teh4yWJnyhAOU8rphFY0fGehQpWsKTWTZFlxm+TEcH7c</span><br><span class="line">9mlFu290z0DE4xzYHv7kKWhConqJAphcNAExm7j&#x2F;qhvQF27DT90tj0oWtjz&#x2F;tCNj</span><br><span class="line">GQIDAQAB</span><br></pre></td></tr></table></figure>
+<p>最后给出完整代码:</p>
+<blockquote>
+<p>rsa库的可以根据解密过程自己写公钥解密的方法。而crypto库在解密的过程中也用到了<br>pqn等参数，不太清楚为什么。所以就没有写出公钥解密的方法。</p>
+</blockquote>
+</li>
+</ol>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br><span class="line">147</span><br><span class="line">148</span><br><span class="line">149</span><br><span class="line">150</span><br><span class="line">151</span><br><span class="line">152</span><br><span class="line">153</span><br><span class="line">154</span><br><span class="line">155</span><br><span class="line">156</span><br><span class="line">157</span><br><span class="line">158</span><br><span class="line">159</span><br><span class="line">160</span><br><span class="line">161</span><br><span class="line">162</span><br><span class="line">163</span><br><span class="line">164</span><br><span class="line">165</span><br><span class="line">166</span><br><span class="line">167</span><br><span class="line">168</span><br><span class="line">169</span><br><span class="line">170</span><br><span class="line">171</span><br><span class="line">172</span><br><span class="line">173</span><br><span class="line">174</span><br><span class="line">175</span><br><span class="line">176</span><br><span class="line">177</span><br><span class="line">178</span><br><span class="line">179</span><br><span class="line">180</span><br><span class="line">181</span><br><span class="line">182</span><br><span class="line">183</span><br><span class="line">184</span><br><span class="line">185</span><br><span class="line">186</span><br><span class="line">187</span><br><span class="line">188</span><br><span class="line">189</span><br><span class="line">190</span><br><span class="line">191</span><br><span class="line">192</span><br><span class="line">193</span><br><span class="line">194</span><br><span class="line">195</span><br><span class="line">196</span><br><span class="line">197</span><br><span class="line">198</span><br><span class="line">199</span><br><span class="line">200</span><br><span class="line">201</span><br><span class="line">202</span><br><span class="line">203</span><br><span class="line">204</span><br><span class="line">205</span><br><span class="line">206</span><br><span class="line">207</span><br><span class="line">208</span><br><span class="line">209</span><br><span class="line">210</span><br><span class="line">211</span><br><span class="line">212</span><br><span class="line">213</span><br><span class="line">214</span><br><span class="line">215</span><br><span class="line">216</span><br><span class="line">217</span><br><span class="line">218</span><br><span class="line">219</span><br><span class="line">220</span><br><span class="line">221</span><br><span class="line">222</span><br><span class="line">223</span><br><span class="line">224</span><br><span class="line">225</span><br><span class="line">226</span><br><span class="line">227</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> requests</span><br><span class="line"><span class="keyword">from</span> Crypto.Random <span class="keyword">import</span> get_random_bytes</span><br><span class="line"><span class="keyword">import</span> base64</span><br><span class="line"><span class="keyword">from</span> Crypto.Signature <span class="keyword">import</span> pkcs1_15</span><br><span class="line"><span class="keyword">from</span> Crypto.Hash <span class="keyword">import</span> SHA256, SHA1</span><br><span class="line"><span class="keyword">from</span> Crypto.PublicKey <span class="keyword">import</span> RSA</span><br><span class="line"><span class="keyword">from</span> Crypto.Cipher <span class="keyword">import</span> PKCS1_OAEP</span><br><span class="line"><span class="keyword">import</span> rsa</span><br><span class="line"></span><br><span class="line">signature = <span class="string">&#x27;n6KsB/rBh3DzRjWVuocnzqyPm6jxyLp31kF80PewabKKsgfO8OaYtWjdwBOLld0E9Ynx0MiH81KYfGrBZv6Ef+gtl55Kkkfezol3UheNtmOhYE+LprI78blh55SeYnixEmd439tLCfQNuvftDYSDkEnlMXZ6Emz8X0J1AnfhUHU=&#x27;</span></span><br><span class="line">rsa_key_str = <span class="string">&#x27;MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDDnI3kW16XWPxx2y8vJwX58/3gNqpe3sgxIBjwhY8HKAbrZOHffcpkPYPO2uZZZSchIUd05E7x3daRbD6dmMVjbYzrs7U9L0m+5l8yKvNdVa9wMG3iWG/4a/e6V8tCDXuTx0i14MZoRYWmZBKwuWDkZCBtd1hq4xiU4fvMRfOg9wIDAQAB&#x27;</span></span><br><span class="line">message = <span class="string">&#x27;encryp_data=Lziso+i0rAjZSZMh/OfdVkACvSVLLUHZVkiLkqOEMGOWPuXCw65y1jr8Az5rC1H0NxkWtPKlSTMHxBM8dSnP1cbOqfdgHSiL5nVZq8k9yXvcShh4OfwZACvikDjDRsQo9nL+G4MjB7q34N5H/8pBZeN4cg9DuCg7ycXF0YG5V+w=&amp;extends_info_data=当前是最强的游戏扩展数据&amp;game_area=当前是最强的游戏区服&amp;game_level=49&amp;game_orderid=X7123456789&amp;game_role_id=x7id&amp;game_role_name=我是最强的角色名称&amp;sdk_version=2.0&amp;subject=大元宝&amp;xiao7_goid=18634202&#x27;</span></span><br><span class="line">encryp_data = <span class="string">&#x27;Lziso+i0rAjZSZMh/OfdVkACvSVLLUHZVkiLkqOEMGOWPuXCw65y1jr8Az5rC1H0NxkWtPKlSTMHxBM8dSnP1cbOqfdgHSiL5nVZq8k9yXvcShh4OfwZACvikDjDRsQo9nL+G4MjB7q34N5H/8pBZeN4cg9DuCg7ycXF0YG5V+w=&#x27;</span></span><br><span class="line"></span><br><span class="line">rsa_public_key = <span class="string">&#x27;&#x27;&#x27;-----BEGIN RSA PUBLIC KEY-----</span></span><br><span class="line"><span class="string">MIIBCgKCAQEAhU9EQ3z/zNCH+68tTN6Vkhnq8jaCx+9iT+zfq6rmwGzdNcErkt8x</span></span><br><span class="line"><span class="string">gqD5iuuQmpnFtF0fM3aKyCdztbYcJcscggceg9Wf14Nu5xitWsG47Mpd4M13RIGX</span></span><br><span class="line"><span class="string">0p5lMuE2zI4x5YCUSsTLV9vNtRK73tnUq8HYcHrRCK+RmylRcXvyIDjpVcGbwT37</span></span><br><span class="line"><span class="string">MebFuufCGqo0rYfZl7bb4kDMgKk5gULGBDxc5tz7YktMXQ0FOa7g9WXsxIWmoy0q</span></span><br><span class="line"><span class="string">OUMZVyHY+55b8vGUT2EevqrpusrnUJvwYRTtTiHHU+ftSV3VwY+1g38CWTk148Lg</span></span><br><span class="line"><span class="string">UL0pIrnVxjPKUbUuoHA+YNbLL/BLpJr7jwIDAQAB</span></span><br><span class="line"><span class="string">-----END RSA PUBLIC KEY-----</span></span><br><span class="line"><span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line">rsa_public_key_str = <span class="string">&#x27;MIIBCgKCAQEAhU9EQ3z/zNCH+68tTN6Vkhnq8jaCx+9iT+zfq6rmwGzdNcErkt8xgqD5iuuQmpnFtF0fM3aKyCdztbYcJcscggceg9Wf14Nu5xitWsG47Mpd4M13RIGX0p5lMuE2zI4x5YCUSsTLV9vNtRK73tnUq8HYcHrRCK+RmylRcXvyIDjpVcGbwT37MebFuufCGqo0rYfZl7bb4kDMgKk5gULGBDxc5tz7YktMXQ0FOa7g9WXsxIWmoy0qOUMZVyHY+55b8vGUT2EevqrpusrnUJvwYRTtTiHHU+ftSV3VwY+1g38CWTk148LgUL0pIrnVxjPKUbUuoHA+YNbLL/BLpJr7jwIDAQAB&#x27;</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">crypto_public_key = <span class="string">&#x27;&#x27;&#x27;-----BEGIN PUBLIC KEY-----</span></span><br><span class="line"><span class="string">MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA59JFc2huRupfSvTmI96e</span></span><br><span class="line"><span class="string">VuAWRAIziNG/sTm0Z+XvWqWFMk4s9WIAu9Pi1d1VKhhwJoUSZKdFvMtKxQ2nACOU</span></span><br><span class="line"><span class="string">u01ykiqKmxYpU2jgKrKdAuM4R9hMnp5eqN7ql1zg5PA/cF07AM0nG/Z2y6XZUSz8</span></span><br><span class="line"><span class="string">mnAv7F0ePf0Ba1CmUAk2r+VwxA2rvpR0HM87T2Qq8b3ZieUuCyp0bxtQmHcbSAEV</span></span><br><span class="line"><span class="string">ALHSucFxPVHKQ7b/cjp5Teh4yWJnyhAOU8rphFY0fGehQpWsKTWTZFlxm+TEcH7c</span></span><br><span class="line"><span class="string">9mlFu290z0DE4xzYHv7kKWhConqJAphcNAExm7j/qhvQF27DT90tj0oWtjz/tCNj</span></span><br><span class="line"><span class="string">GQIDAQAB</span></span><br><span class="line"><span class="string">-----END PUBLIC KEY-----</span></span><br><span class="line"><span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"></span><br><span class="line">crypto_public_key_str = <span class="string">&#x27;MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA59JFc2huRupfSvTmI96eVuAWRAIziNG/sTm0Z+XvWqWFMk4s9WIAu9Pi1d1VKhhwJoUSZKdFvMtKxQ2nACOUu01ykiqKmxYpU2jgKrKdAuM4R9hMnp5eqN7ql1zg5PA/cF07AM0nG/Z2y6XZUSz8mnAv7F0ePf0Ba1CmUAk2r+VwxA2rvpR0HM87T2Qq8b3ZieUuCyp0bxtQmHcbSAEVALHSucFxPVHKQ7b/cjp5Teh4yWJnyhAOU8rphFY0fGehQpWsKTWTZFlxm+TEcH7c9mlFu290z0DE4xzYHv7kKWhConqJAphcNAExm7j/qhvQF27DT90tj0oWtjz/tCNjGQIDAQAB&#x27;</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">crypto_generate_keys</span>():</span></span><br><span class="line">    key = RSA.generate(<span class="number">2048</span>)</span><br><span class="line">    private_key = key.export_key()</span><br><span class="line">    file_out = <span class="built_in">open</span>(<span class="string">&quot;private.pem&quot;</span>, <span class="string">&quot;wb&quot;</span>)</span><br><span class="line">    file_out.write(private_key)</span><br><span class="line"></span><br><span class="line">    public_key = key.publickey().export_key()</span><br><span class="line">    file_out = <span class="built_in">open</span>(<span class="string">&quot;public.pem&quot;</span>, <span class="string">&quot;wb&quot;</span>)</span><br><span class="line">    file_out.write(public_key)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">rsa_generate_keys</span>():</span></span><br><span class="line">    (pubkey, privkey) = rsa.newkeys(<span class="number">2048</span>)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">with</span> <span class="built_in">open</span>(<span class="string">&#x27;public2.pem&#x27;</span>, <span class="string">&#x27;w+&#x27;</span>) <span class="keyword">as</span> f:</span><br><span class="line">        f.write(pubkey.save_pkcs1().decode())</span><br><span class="line"></span><br><span class="line">    <span class="keyword">with</span> <span class="built_in">open</span>(<span class="string">&#x27;private2.pem&#x27;</span>, <span class="string">&#x27;w+&#x27;</span>) <span class="keyword">as</span> f:</span><br><span class="line">        f.write(privkey.save_pkcs1().decode())</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">rsa_get_pubkey</span>(<span class="params">pub_string</span>):</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        pubkey = rsa.PublicKey.load_pkcs1(pub_string)</span><br><span class="line">        print(pubkey)</span><br><span class="line">    <span class="keyword">except</span>:</span><br><span class="line">        print(<span class="string">&#x27;1 failed&#x27;</span>)</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            pubkey = rsa.PublicKey.load_pkcs1(pub_string, <span class="built_in">format</span>=<span class="string">&#x27;DER&#x27;</span>)</span><br><span class="line">            print(pubkey)</span><br><span class="line">        <span class="keyword">except</span>:</span><br><span class="line">            print(<span class="string">&#x27;2 failed&#x27;</span>)</span><br><span class="line">            <span class="keyword">try</span>:</span><br><span class="line">                pubkey = rsa.PublicKey.load_pkcs1_openssl_der(pub_string)</span><br><span class="line">                print(pubkey)</span><br><span class="line">            <span class="keyword">except</span>:</span><br><span class="line">                print(<span class="string">&#x27;3 failed&#x27;</span>)</span><br><span class="line">                <span class="keyword">try</span>:</span><br><span class="line">                    pubkey = rsa.PublicKey.load_pkcs1_openssl_pem(pub_string)</span><br><span class="line">                    print(pubkey)</span><br><span class="line">                <span class="keyword">except</span>:</span><br><span class="line">                    print(<span class="string">&#x27;4 failed&#x27;</span>)</span><br><span class="line">                    <span class="keyword">try</span>:</span><br><span class="line">                        pubkey = rsa.PublicKey.load_pkcs1(</span><br><span class="line">                            base64.b64decode(pub_string), <span class="built_in">format</span>=<span class="string">&#x27;DER&#x27;</span>)</span><br><span class="line">                        print(pubkey)</span><br><span class="line">                    <span class="keyword">except</span>:</span><br><span class="line">                        print(<span class="string">&#x27;5 failed&#x27;</span>)</span><br><span class="line">                        <span class="keyword">try</span>:</span><br><span class="line">                            pubkey = rsa.PublicKey.load_pkcs1_openssl_der(</span><br><span class="line">                                base64.b64decode(pub_string))</span><br><span class="line">                            print(pubkey)</span><br><span class="line">                        <span class="keyword">except</span>:</span><br><span class="line">                            print(<span class="string">&#x27;6 failed&#x27;</span>)</span><br><span class="line">    <span class="keyword">if</span> pubkey:</span><br><span class="line">        print(<span class="string">&#x27;rsa_get_pubkey success&#x27;</span>)</span><br><span class="line">        <span class="keyword">return</span> pubkey</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">crypto_get_pubkey</span>(<span class="params">pub_string</span>):</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        pubkey = RSA.import_key(pub_string)</span><br><span class="line">        print(pubkey.n)</span><br><span class="line">        print(pubkey.e)</span><br><span class="line">    <span class="keyword">except</span>:</span><br><span class="line">        print(<span class="string">&#x27;1 failed&#x27;</span>)</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            pubkey = RSA.import_key(base64.b64decode(pub_string))</span><br><span class="line">            print(pubkey.n)</span><br><span class="line">            print(pubkey.e)</span><br><span class="line">        <span class="keyword">except</span>:</span><br><span class="line">            print(<span class="string">&#x27;2 failed&#x27;</span>)</span><br><span class="line">    <span class="keyword">if</span> pubkey:</span><br><span class="line">        print(<span class="string">&#x27;crypto_get_pubkey success&#x27;</span>)</span><br><span class="line">        <span class="keyword">return</span> pubkey</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">crypto_sign_verify</span>(<span class="params">pubkey_str,message_str,signature_str</span>):</span></span><br><span class="line">    <span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="string">    如果signature是从外部获得的string格式，则需要base64解码一下。否则签名的时候直接用即可</span></span><br><span class="line"><span class="string">    &#x27;&#x27;&#x27;</span></span><br><span class="line">    <span class="comment"># prikey = RSA.import_key(open(&#x27;private.pem&#x27;).read())</span></span><br><span class="line">    <span class="comment"># missing_padding = 4 - len(message) % 4</span></span><br><span class="line">    <span class="comment"># if missing_padding:</span></span><br><span class="line">    <span class="comment">#     message += &#x27;=&#x27;* missing_padding</span></span><br><span class="line">    <span class="comment"># h = SHA.new(message.encode())</span></span><br><span class="line">    <span class="comment"># signature = pkcs1_15.new(prikey).sign(h)</span></span><br><span class="line"></span><br><span class="line">    pubkey = crypto_get_pubkey(pubkey_str)</span><br><span class="line">    h = SHA1.new(message_str.encode())</span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        pkcs1_15.new(pubkey).verify(h, base64.b64decode(signature_str))</span><br><span class="line">        print(<span class="string">&quot;The signature is valid.&quot;</span>)</span><br><span class="line">    <span class="keyword">except</span> (ValueError, TypeError):</span><br><span class="line">        print(<span class="string">&quot;The signature is not valid.&quot;</span>)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">rsa_sign_verify</span>(<span class="params">pubkey_str,message_str,signature_str</span>):</span></span><br><span class="line">    <span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="string">    如果signature是从外部获得的string格式，则需要base64解码一下。否则签名的时候直接用即可</span></span><br><span class="line"><span class="string">    &#x27;&#x27;&#x27;</span></span><br><span class="line">    <span class="comment"># (pubkey, privkey) = rsa.newkeys(512)</span></span><br><span class="line">    <span class="comment"># message = &#x27;Go left at the blue tree&#x27;</span></span><br><span class="line">    <span class="comment"># signature = rsa.sign(message.encode(), privkey, &#x27;SHA-1&#x27;)</span></span><br><span class="line">    <span class="comment"># message = &#x27;Go right at the blue tree&#x27;</span></span><br><span class="line"></span><br><span class="line">    pubkey = rsa_get_pubkey(pubkey_str)</span><br><span class="line">    result = rsa.verify(message_str.encode(), base64.b64decode(signature_str), pubkey)</span><br><span class="line">    print(result)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">rsa_encrypt_decrypt</span>():</span></span><br><span class="line">    (bob_pub, bob_priv) = rsa.newkeys(<span class="number">512</span>)</span><br><span class="line">    message = <span class="string">&#x27;hello Bob!&#x27;</span>.encode()</span><br><span class="line">    crypto = rsa.encrypt(message, bob_pub)</span><br><span class="line">    print(base64.b64encode(crypto).decode())</span><br><span class="line">    message = rsa.decrypt(crypto, bob_priv)</span><br><span class="line">    print(message.decode())</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_max_out_len</span>(<span class="params">key_n</span>):</span></span><br><span class="line">    <span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="string">    根据key的长度获取可以一次解密输出的密文数据的长度</span></span><br><span class="line"><span class="string">    密文数据的长度-11 就是一次解密的明文数据的最大长度</span></span><br><span class="line"><span class="string">    &#x27;&#x27;&#x27;</span></span><br><span class="line">    bits = <span class="number">0</span></span><br><span class="line">    <span class="keyword">while</span> key_n &gt;&gt; bits:</span><br><span class="line">        bits += <span class="number">1</span></span><br><span class="line">    r, q = <span class="built_in">divmod</span>(bits, <span class="number">8</span>)</span><br><span class="line">    <span class="keyword">if</span> q != <span class="number">0</span>:</span><br><span class="line">        r += <span class="number">1</span></span><br><span class="line">    <span class="keyword">return</span> r</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_max_input_len</span>(<span class="params">key_n</span>):</span></span><br><span class="line">    <span class="keyword">return</span> get_max_out_len(key_n)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">crypto_decrypt_with_public</span>():</span></span><br><span class="line">    <span class="comment"># crypto 不允许公钥解密，算法有点看不懂，所以也不太会改</span></span><br><span class="line">    pubkey = crypto_get_pubkey(rsa_key_str)</span><br><span class="line">    cipher_rsa_decrypt = PKCS1_OAEP.new(pubkey)</span><br><span class="line">    <span class="keyword">if</span> <span class="built_in">len</span>(base64.b64decode(encryp_data)) &lt;= get_max_out_len(pubkey.n):</span><br><span class="line">        data = cipher_rsa_decrypt.decrypt(base64.b64decode(encryp_data))</span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        print(<span class="string">&#x27;需要分段解密&#x27;</span>)</span><br><span class="line">        <span class="keyword">pass</span></span><br><span class="line">    print(data)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">decrypt_with_public_key</span>(<span class="params">crypto, pub_key</span>):</span></span><br><span class="line">    blocksize = rsa.common.byte_size(pub_key.n)</span><br><span class="line">    encrypted = rsa.transform.bytes2int(crypto)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># blind_r = rsa.randnum.randint(pub_key.n - 1)</span></span><br><span class="line">    <span class="comment"># blinded = (encrypted * pow(blind_r, pub_key.e, pub_key.n)) % pub_key.n </span></span><br><span class="line">    <span class="comment"># decrypted = rsa.core.decrypt_int(blinded, pub_key.e, pub_key.n)</span></span><br><span class="line">    decrypted = rsa.core.decrypt_int(encrypted, pub_key.e, pub_key.n)</span><br><span class="line"></span><br><span class="line">    cleartext = rsa.transform.int2bytes(decrypted, blocksize)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># If we can&#x27;t find the cleartext marker, decryption failed.</span></span><br><span class="line">    <span class="keyword">if</span> cleartext[<span class="number">0</span>:<span class="number">2</span>] != <span class="string">b&#x27;\x00\x01&#x27;</span>:  <span class="comment">#这里表示是私钥加密，公钥加密这里是\x02</span></span><br><span class="line">        <span class="keyword">raise</span> Exception(<span class="string">&#x27;Decryption failed,the message is not encrypted by private key&#x27;</span>)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># Find the 00 separator between the padding and the message</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        sep_idx = cleartext.index(<span class="string">b&#x27;\x00&#x27;</span>, <span class="number">2</span>)   <span class="comment">#寻找填充数据的最后一个byte</span></span><br><span class="line">    <span class="keyword">except</span> ValueError:</span><br><span class="line">        <span class="keyword">raise</span> Exception(<span class="string">&#x27;Decryption failed,cannot find end of padding space&#x27;</span>)</span><br><span class="line">    <span class="keyword">return</span> cleartext[sep_idx + <span class="number">1</span>:]</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">rsa_decrypt_with_public</span>():</span></span><br><span class="line">    pubkey = rsa_get_pubkey(rsa_key_str)</span><br><span class="line">    <span class="keyword">if</span> <span class="built_in">len</span>(base64.b64decode(encryp_data)) &lt;= get_max_out_len(pubkey.n):</span><br><span class="line">        decrypt = decrypt_with_public_key(base64.b64decode(encryp_data), pubkey)</span><br><span class="line">        decrypt_dict = &#123;&#125;</span><br><span class="line">        <span class="keyword">for</span> pair_str <span class="keyword">in</span> decrypt.decode().split(<span class="string">&#x27;&amp;&#x27;</span>):</span><br><span class="line">            (key, value) = pair_str.split(<span class="string">&#x27;=&#x27;</span>)</span><br><span class="line">            decrypt_dict[key] = value</span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        print(<span class="string">&#x27;需要分段解密&#x27;</span>)</span><br><span class="line">        <span class="keyword">pass</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> __name__ == <span class="string">&#x27;__main__&#x27;</span>:</span><br><span class="line">    processes = [rsa_public_key,rsa_public_key_str,crypto_public_key,crypto_public_key_str]</span><br><span class="line">    <span class="keyword">for</span> process <span class="keyword">in</span> processes:</span><br><span class="line">        pubkey = rsa_get_pubkey(process)</span><br><span class="line">        pubkey = crypto_get_pubkey(process)</span><br><span class="line">    rsa_decrypt_with_public()</span><br><span class="line">   </span><br></pre></td></tr></table></figure>
+<p>最后的总结：</p>
+<p>pycryptodome 不支持公钥解密</p>
+<p>rsa 支持公钥解密</p>
+<p>两者都支持公钥加密私钥解密，验证签名等</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/RSA/" rel="tag"># RSA</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2018/07/20/python-flask-%E8%AE%BE%E7%BD%AE/" rel="prev" title="python flask 设置">
+      <i class="fa fa-chevron-left"></i> python flask 设置
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2018/07/30/RSA%E5%8A%A0%E8%A7%A3%E5%AF%86%E7%AE%97%E6%B3%95%E5%8E%9F%E7%90%86/" rel="next" title="RSA加解密算法原理">
+      RSA加解密算法原理 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="不侯鸟"
+      src="/images/avatar.gif">
+  <p class="site-author-name" itemprop="name">不侯鸟</p>
+  <div class="site-description" itemprop="description">学习总结</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">49</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">6</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/nangonghuang" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;nangonghuang" rel="noopener" target="_blank"><i class="github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://weibo.com/jzlandon/" title="Weibo → https:&#x2F;&#x2F;weibo.com&#x2F;jzlandon&#x2F;" rel="noopener" target="_blank"><i class="weibo fa-fw"></i>Weibo</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="http://powman.org/" title="http:&#x2F;&#x2F;powman.org&#x2F;" rel="noopener" target="_blank">angryPowman</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">不侯鸟</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
